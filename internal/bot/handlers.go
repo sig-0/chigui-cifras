@@ -145,32 +145,47 @@ func (h *FxHandler) Currencies(ctx context.Context, b *bot.Bot, update *models.U
 
 // Dolar handles the /dolar shortcut
 func (h *FxHandler) Dolar(ctx context.Context, b *bot.Bot, update *models.Update) {
-	h.rateShortcut(ctx, b, update, "USD")
+	h.rateShortcut(ctx, b, update, currencies.USD.String())
 }
 
 // Euro handles the /euro shortcut
 func (h *FxHandler) Euro(ctx context.Context, b *bot.Bot, update *models.Update) {
-	h.rateShortcut(ctx, b, update, "EUR")
+	h.rateShortcut(ctx, b, update, currencies.EUR.String())
 }
 
-// USDT handles the /usdt shortcut
+// USDT handles the /usdt shortcut, showing both BUY and SELL rates
 func (h *FxHandler) USDT(ctx context.Context, b *bot.Bot, update *models.Update) {
-	h.rateShortcut(ctx, b, update, "USDT")
+	target := currencies.VES.String()
+
+	rates, err := h.fxClient.Rate(ctx, currencies.USDT.String(), target, "")
+	if err != nil {
+		h.reply(ctx, b, update, ErrorMessage(err, LanguageES))
+
+		return
+	}
+
+	if len(rates.Results) == 0 {
+		h.reply(ctx, b, update, "No se encontraron tasas para USDT/"+target)
+
+		return
+	}
+
+	h.reply(ctx, b, update, FormatRates(rates.Results, LanguageES))
 }
 
 // Rublo handles the /rublo shortcut
 func (h *FxHandler) Rublo(ctx context.Context, b *bot.Bot, update *models.Update) {
-	h.rateShortcut(ctx, b, update, "RUB")
+	h.rateShortcut(ctx, b, update, currencies.RUB.String())
 }
 
 // Lira handles the /lira shortcut
 func (h *FxHandler) Lira(ctx context.Context, b *bot.Bot, update *models.Update) {
-	h.rateShortcut(ctx, b, update, "TRY")
+	h.rateShortcut(ctx, b, update, currencies.TRY.String())
 }
 
 // Yuan handles the /yuan shortcut
 func (h *FxHandler) Yuan(ctx context.Context, b *bot.Bot, update *models.Update) {
-	h.rateShortcut(ctx, b, update, "CNY")
+	h.rateShortcut(ctx, b, update, currencies.CNY.String())
 }
 
 // InlineQuery handles inline mode requests
