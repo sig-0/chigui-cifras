@@ -35,7 +35,9 @@ func New(
 
 	opts := []bot.Option{
 		bot.WithDefaultHandler(func(ctx context.Context, b *bot.Bot, update *models.Update) {
-			// Ignore non-command messages
+			if update.InlineQuery != nil {
+				handlers.InlineQuery(ctx, b, update)
+			}
 		}),
 	}
 

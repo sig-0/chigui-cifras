@@ -25,6 +25,10 @@ Atajos VES:
 
 - `/dolar`, `/euro`, `/usdt`, `/rublo`, `/lira`, `/yuan`
 
+Modo inline:
+
+- Usa `@TuBot USD VES` o `@TuBot USD` (destino VES por defecto)
+
 ## Configuración
 
 La configuración parte de valores por defecto y se puede sobrescribir con un TOML y/o variables de entorno. Si existe un
@@ -60,4 +64,3 @@ Al iniciar, el bot registra el webhook automáticamente usando `CHIGUI_WEBHOOK_U
 
 - El endpoint del webhook en el path de esa URL.
 - `GET /health` para health checks.
-
