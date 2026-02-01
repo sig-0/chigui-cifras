@@ -37,6 +37,7 @@ func TestClient_Rate(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v1/rates/USD/VES", r.URL.Path)
+		assert.Equal(t, "BCV", r.URL.Query().Get("source"))
 
 		w.Header().Set("Content-Type", "application/json")
 		require.NoError(t, json.NewEncoder(w).Encode(expected))
@@ -45,7 +46,7 @@ func TestClient_Rate(t *testing.T) {
 
 	client := NewClient(srv.URL, time.Second)
 
-	resp, err := client.Rate(context.Background(), "USD", "VES")
+	resp, err := client.Rate(context.Background(), "USD", "VES", "BCV")
 
 	require.NoError(t, err)
 	require.Len(t, resp.Results, 1)

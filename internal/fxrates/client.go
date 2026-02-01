@@ -25,9 +25,13 @@ func NewClient(baseURL string, timeout time.Duration) *Client {
 	}
 }
 
-// Rate fetches the exchange rate for a specific currency pair
-func (c *Client) Rate(ctx context.Context, base, target string) (*PageExchangeRate, error) {
+// Rate fetches the exchange rate for a specific currency pair.
+// If source is non-empty, it filters by that source
+func (c *Client) Rate(ctx context.Context, base, target, source string) (*PageExchangeRate, error) {
 	path := fmt.Sprintf("/v1/rates/%s/%s", base, target)
+	if source != "" {
+		path += "?source=" + url.QueryEscape(source)
+	}
 
 	return get[PageExchangeRate](ctx, c, path)
 }

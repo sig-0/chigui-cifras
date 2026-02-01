@@ -8,6 +8,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/sig-0/fxrates/provider/currencies"
+	"github.com/sig-0/fxrates/provider/ves"
 	"github.com/sig-0/fxrates/storage/types"
 
 	"github.com/sig-0/chigui-cifras/internal/fxrates"
@@ -63,7 +64,9 @@ func (h *FxHandler) Rate(ctx context.Context, b *bot.Bot, update *models.Update)
 		target = strings.ToUpper(args[1])
 	}
 
-	rates, err := h.fxClient.Rate(ctx, base, target)
+	source := sourceForCurrency(fxrates.Currency(base))
+
+	rates, err := h.fxClient.Rate(ctx, base, target, source.String())
 	if err != nil {
 		h.reply(ctx, b, update, ErrorMessage(err, lang))
 
@@ -183,7 +186,9 @@ func (h *FxHandler) InlineQuery(ctx context.Context, b *bot.Bot, update *models.
 		return
 	}
 
-	rates, err := h.fxClient.Rate(ctx, base, target)
+	source := sourceForCurrency(fxrates.Currency(base))
+
+	rates, err := h.fxClient.Rate(ctx, base, target, source.String())
 	if err != nil {
 		h.answerInlineError(ctx, b, inlineQuery, lang)
 
@@ -215,8 +220,9 @@ func (h *FxHandler) InlineQuery(ctx context.Context, b *bot.Bot, update *models.
 
 func (h *FxHandler) rateShortcut(ctx context.Context, b *bot.Bot, update *models.Update, base string) {
 	target := currencies.VES.String()
+	source := sourceForCurrency(fxrates.Currency(base))
 
-	rates, err := h.fxClient.Rate(ctx, base, target)
+	rates, err := h.fxClient.Rate(ctx, base, target, source.String())
 	if err != nil {
 		h.reply(ctx, b, update, ErrorMessage(err, LanguageES))
 
@@ -279,8 +285,9 @@ func (h *FxHandler) languageForInline(query *models.InlineQuery) Language {
 
 func (h *FxHandler) reply(ctx context.Context, b *bot.Bot, update *models.Update, text string) {
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: update.Message.Chat.ID,
-		Text:   text,
+		ChatID:    update.Message.Chat.ID,
+		Text:      text,
+		ParseMode: models.ParseModeMarkdown,
 	})
 	if err != nil {
 		return
@@ -389,6 +396,17 @@ func (h *FxHandler) answerInlineResults(
 
 func inlineResultID(title string) string {
 	return strings.ReplaceAll(strings.ToLower(title), "/", "-")
+}
+
+// sourceForCurrency returns the preferred source for a given base currency.
+// For fiat currencies, we use BCV
+func sourceForCurrency(base fxrates.Currency) fxrates.Source {
+	switch base {
+	case currencies.USD, currencies.EUR, currencies.RUB, currencies.TRY, currencies.CNY:
+		return ves.BCVSource
+	default:
+		return ""
+	}
 }
 
 // selectPreferredRate selects the best rate from the results based on the currency pair.

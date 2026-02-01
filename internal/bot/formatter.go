@@ -52,14 +52,14 @@ func FormatRate(rate fxrates.ExchangeRate, lang Language) string {
 	sb.WriteString(fmt.Sprintf("%s %s → %s\n\n", emoji, rate.Base, rate.Target))
 
 	if lang == LanguageEN {
-		sb.WriteString(fmt.Sprintf("Rate: %.4f\n", rate.Rate))
-		sb.WriteString(fmt.Sprintf("Source: %s\n", rate.Source))
-		sb.WriteString(fmt.Sprintf("Type: %s\n\n", rate.RateType))
+		sb.WriteString(fmt.Sprintf("*Rate:* %.2f\n", rate.Rate))
+		sb.WriteString(fmt.Sprintf("*Source:* %s\n", rate.Source))
+		sb.WriteString(fmt.Sprintf("*Type:* %s\n\n", rate.RateType))
 		sb.WriteString(fmt.Sprintf("📅 Effective: %s", formatTime(rate.AsOf)))
 	} else {
-		sb.WriteString(fmt.Sprintf("Tasa: %.4f\n", rate.Rate))
-		sb.WriteString(fmt.Sprintf("Fuente: %s\n", rate.Source))
-		sb.WriteString(fmt.Sprintf("Tipo: %s\n\n", rate.RateType))
+		sb.WriteString(fmt.Sprintf("*Tasa:* %.2f\n", rate.Rate))
+		sb.WriteString(fmt.Sprintf("*Fuente:* %s\n", rate.Source))
+		sb.WriteString(fmt.Sprintf("*Tipo:* %s\n\n", rate.RateType))
 		sb.WriteString(fmt.Sprintf("📅 Efectivo: %s", formatTime(rate.AsOf)))
 	}
 
@@ -88,7 +88,7 @@ func FormatRates(rates []fxrates.ExchangeRate, lang Language) string {
 	}
 
 	for _, rate := range rates {
-		sb.WriteString(fmt.Sprintf("• %s: %.4f (%s, %s)\n", rate.Target, rate.Rate, rate.Source, rate.RateType))
+		sb.WriteString(fmt.Sprintf("• %s: %.2f (%s, %s)\n", rate.Target, rate.Rate, rate.Source, rate.RateType))
 	}
 
 	if lang == LanguageEN {

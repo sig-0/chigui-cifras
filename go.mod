@@ -14,7 +14,9 @@ require (
 
 require (
 	github.com/99designs/gqlgen v0.17.86 // indirect
+	github.com/PuerkitoBio/goquery v1.11.0 // indirect
 	github.com/agnivade/levenshtein v1.2.1 // indirect
+	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-chi/chi/v5 v5.2.4 // indirect
 	github.com/go-chi/httplog/v3 v3.3.0 // indirect
@@ -26,5 +28,6 @@ require (
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/sosodev/duration v1.3.1 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.31 // indirect
+	golang.org/x/net v0.48.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
