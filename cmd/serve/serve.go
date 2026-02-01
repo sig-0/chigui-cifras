@@ -139,6 +139,11 @@ func runWebhookMode(
 ) error {
 	group, gCtx := errgroup.WithContext(ctx)
 
+	// Delete any existing webhook to clear stale configuration
+	if _, err := tgBot.DeleteWebhook(gCtx, false); err != nil {
+		return fmt.Errorf("unable to delete existing webhook: %w", err)
+	}
+
 	_, setErr := tgBot.SetWebhook(
 		gCtx,
 		cfg.Telegram.WebhookURL,
