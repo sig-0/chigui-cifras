@@ -3,7 +3,6 @@ package bot
 import (
 	"fmt"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/sig-0/fxrates/provider/currencies"
@@ -45,24 +44,6 @@ func formatTime(value time.Time) string {
 	return value.In(caracasLocation).Format("2006-01-02 15:04 MST")
 }
 
-// writeTabbed writes tabbed output directly into the provided builder
-func writeTabbed(sb *strings.Builder, write func(w *tabwriter.Writer)) {
-	w := tabwriter.NewWriter(sb, 0, 0, 2, ' ', 0)
-	write(w)
-	_ = w.Flush()
-}
-
-// writeTabLines writes lines separated by newlines without a trailing newline
-func writeTabLines(w *tabwriter.Writer, lines []string) {
-	for i, line := range lines {
-		if i > 0 {
-			fmt.Fprint(w, "\n")
-		}
-
-		fmt.Fprint(w, line)
-	}
-}
-
 // FormatRate formats a single exchange rate for display
 func FormatRate(rate fxrates.ExchangeRate, lang Language) string {
 	emoji := getEmoji(rate.Base)
@@ -71,31 +52,15 @@ func FormatRate(rate fxrates.ExchangeRate, lang Language) string {
 	sb.WriteString(fmt.Sprintf("%s %s → %s\n\n", emoji, rate.Base, rate.Target))
 
 	if lang == LanguageEN {
-		writeTabbed(&sb, func(w *tabwriter.Writer) {
-			fmt.Fprintf(w, "Rate:\t%.4f\n", rate.Rate)
-			fmt.Fprintf(w, "Source:\t%s\n", rate.Source)
-			fmt.Fprintf(w, "Type:\t%s", rate.RateType)
-		})
+		sb.WriteString(fmt.Sprintf("Rate: %.4f\n", rate.Rate))
+		sb.WriteString(fmt.Sprintf("Source: %s\n", rate.Source))
+		sb.WriteString(fmt.Sprintf("Type: %s\n\n", rate.RateType))
+		sb.WriteString(fmt.Sprintf("📅 Effective: %s", formatTime(rate.AsOf)))
 	} else {
-		writeTabbed(&sb, func(w *tabwriter.Writer) {
-			fmt.Fprintf(w, "Tasa:\t%.4f\n", rate.Rate)
-			fmt.Fprintf(w, "Fuente:\t%s\n", rate.Source)
-			fmt.Fprintf(w, "Tipo:\t%s", rate.RateType)
-		})
-	}
-
-	sb.WriteString("\n\n")
-
-	if lang == LanguageEN {
-		writeTabbed(&sb, func(w *tabwriter.Writer) {
-			fmt.Fprintf(w, "📅 As of:\t%s\n", formatTime(rate.AsOf))
-			fmt.Fprintf(w, "🔄 Fetched:\t%s", formatTime(rate.FetchedAt))
-		})
-	} else {
-		writeTabbed(&sb, func(w *tabwriter.Writer) {
-			fmt.Fprintf(w, "📅 Fecha:\t%s\n", formatTime(rate.AsOf))
-			fmt.Fprintf(w, "🔄 Actualizado:\t%s", formatTime(rate.FetchedAt))
-		})
+		sb.WriteString(fmt.Sprintf("Tasa: %.4f\n", rate.Rate))
+		sb.WriteString(fmt.Sprintf("Fuente: %s\n", rate.Source))
+		sb.WriteString(fmt.Sprintf("Tipo: %s\n\n", rate.RateType))
+		sb.WriteString(fmt.Sprintf("📅 Efectivo: %s", formatTime(rate.AsOf)))
 	}
 
 	return sb.String()
@@ -122,29 +87,21 @@ func FormatRates(rates []fxrates.ExchangeRate, lang Language) string {
 		sb.WriteString(fmt.Sprintf("%s Tasas de %s\n\n", emoji, base))
 	}
 
-	writeTabbed(&sb, func(w *tabwriter.Writer) {
-		if lang == LanguageEN {
-			fmt.Fprint(w, "Target\tRate\tSource\tType")
-		} else {
-			fmt.Fprint(w, "Destino\tTasa\tFuente\tTipo")
-		}
-
-		for _, rate := range rates {
-			fmt.Fprintf(w, "\n%s\t%.4f\t%s\t%s", rate.Target, rate.Rate, rate.Source, rate.RateType)
-		}
-	})
+	for _, rate := range rates {
+		sb.WriteString(fmt.Sprintf("• %s: %.4f (%s, %s)\n", rate.Target, rate.Rate, rate.Source, rate.RateType))
+	}
 
 	if lang == LanguageEN {
-		sb.WriteString(fmt.Sprintf("\n📅 As of: %s", formatTime(rates[0].AsOf)))
+		sb.WriteString(fmt.Sprintf("\n📅 Effective: %s", formatTime(rates[0].AsOf)))
 	} else {
-		sb.WriteString(fmt.Sprintf("\n📅 Fecha: %s", formatTime(rates[0].AsOf)))
+		sb.WriteString(fmt.Sprintf("\n📅 Efectivo: %s", formatTime(rates[0].AsOf)))
 	}
 
 	return sb.String()
 }
 
 // FormatCurrencies formats the list of currencies for display
-func FormatCurrencies(currencies []fxrates.Currency, lang Language) string {
+func FormatCurrencies(currencyList []fxrates.Currency, lang Language) string {
 	var sb strings.Builder
 	if lang == LanguageEN {
 		sb.WriteString("💱 Supported currencies\n\n")
@@ -152,19 +109,11 @@ func FormatCurrencies(currencies []fxrates.Currency, lang Language) string {
 		sb.WriteString("💱 Monedas soportadas\n\n")
 	}
 
-	writeTabbed(&sb, func(w *tabwriter.Writer) {
-		if lang == LanguageEN {
-			fmt.Fprint(w, "Currency\tEmoji")
-		} else {
-			fmt.Fprint(w, "Moneda\tEmoji")
-		}
+	for _, currency := range currencyList {
+		sb.WriteString(fmt.Sprintf("%s %s\n", getEmoji(currency), currency))
+	}
 
-		for _, currency := range currencies {
-			fmt.Fprintf(w, "\n%s\t%s", currency, getEmoji(currency))
-		}
-	})
-
-	return sb.String()
+	return strings.TrimSuffix(sb.String(), "\n")
 }
 
 // StartMessage returns the welcome message
@@ -174,22 +123,14 @@ func StartMessage(lang Language) string {
 		sb.WriteString("👋 Hello!\n\n")
 		sb.WriteString("I provide real-time exchange rates for VES (Venezuelan Bolivar).\n\n")
 		sb.WriteString("Quick commands:\n")
-		writeTabbed(&sb, func(w *tabwriter.Writer) {
-			writeTabLines(w, []string{
-				"• /dolar\tUSD/VES rate",
-				"• /euro\tEUR/VES rate",
-				"• /usdt\tUSDT/VES rate",
-			})
-		})
-		sb.WriteString("\n\nMore options:\n")
-		writeTabbed(&sb, func(w *tabwriter.Writer) {
-			writeTabLines(w, []string{
-				"• /rate <base> [target]\tGet a specific rate",
-				"• /rates <base>\tAll rates for a currency",
-				"• /currencies\tList available currencies",
-			})
-		})
-		sb.WriteString("\n\nType /help to see all commands.")
+		sb.WriteString("• /dolar - USD/VES rate\n")
+		sb.WriteString("• /euro - EUR/VES rate\n")
+		sb.WriteString("• /usdt - USDT/VES rate\n")
+		sb.WriteString("\nMore options:\n")
+		sb.WriteString("• /rate <base> [target] - Get a specific rate\n")
+		sb.WriteString("• /rates <base> - All rates for a currency\n")
+		sb.WriteString("• /currencies - List available currencies\n")
+		sb.WriteString("\nType /help to see all commands.")
 
 		return sb.String()
 	}
@@ -198,22 +139,14 @@ func StartMessage(lang Language) string {
 	sb.WriteString("👋 ¡Hola!\n\n")
 	sb.WriteString("Ofrezco tasas de cambio en tiempo real para VES (Bolívar venezolano).\n\n")
 	sb.WriteString("Comandos rápidos:\n") //nolint:misspell // Spanish copy
-	writeTabbed(&sb, func(w *tabwriter.Writer) {
-		writeTabLines(w, []string{
-			"• /dolar\tTasa USD/VES",
-			"• /euro\tTasa EUR/VES",
-			"• /usdt\tTasa USDT/VES",
-		})
-	})
-	sb.WriteString("\n\nMás opciones:\n")
-	writeTabbed(&sb, func(w *tabwriter.Writer) {
-		writeTabLines(w, []string{
-			"• /tasa <base> [destino]\tObtener una tasa específica",
-			"• /tasas <base>\tTodas las tasas de una moneda",
-			"• /monedas\tListar monedas disponibles",
-		})
-	})
-	sb.WriteString("\n\nEscribe /ayuda para ver todos los comandos.") //nolint:misspell // Spanish copy
+	sb.WriteString("• /dolar - Tasa USD/VES\n")
+	sb.WriteString("• /euro - Tasa EUR/VES\n")
+	sb.WriteString("• /usdt - Tasa USDT/VES\n")
+	sb.WriteString("\nMás opciones:\n")
+	sb.WriteString("• /tasa <base> [destino] - Obtener una tasa específica\n")
+	sb.WriteString("• /tasas <base> - Todas las tasas de una moneda\n")
+	sb.WriteString("• /monedas - Listar monedas disponibles\n")
+	sb.WriteString("\nEscribe /ayuda para ver todos los comandos.") //nolint:misspell // Spanish copy
 
 	return sb.String()
 }
@@ -225,32 +158,20 @@ func HelpMessage(lang Language) string {
 
 		sb.WriteString("📖 ChiguiCifras Commands\n\n")
 		sb.WriteString("Rate queries:\n")
-		writeTabbed(&sb, func(w *tabwriter.Writer) {
-			writeTabLines(w, []string{
-				"• /rate <base> [target]\tGet an exchange rate",
-				"• /rates <base>\tList all rates for a currency",
-				"• /currencies\tList available currencies",
-			})
-		})
+		sb.WriteString("• /rate <base> [target] - Get an exchange rate\n")
+		sb.WriteString("• /rates <base> - List all rates for a currency\n")
+		sb.WriteString("• /currencies - List available currencies\n")
 
-		sb.WriteString("\n\nVES shortcuts:\n")
-		writeTabbed(&sb, func(w *tabwriter.Writer) {
-			writeTabLines(w, []string{
-				"• /dolar\tUSD/VES",
-				"• /euro\tEUR/VES",
-				"• /usdt\tUSDT/VES",
-				"• /rublo\tRUB/VES",
-				"• /lira\tTRY/VES",
-				"• /yuan\tCNY/VES",
-			})
-		})
+		sb.WriteString("\nVES shortcuts:\n")
+		sb.WriteString("• /dolar - USD/VES\n")
+		sb.WriteString("• /euro - EUR/VES\n")
+		sb.WriteString("• /usdt - USDT/VES\n")
+		sb.WriteString("• /rublo - RUB/VES\n")
+		sb.WriteString("• /lira - TRY/VES\n")
+		sb.WriteString("• /yuan - CNY/VES\n")
 
-		sb.WriteString("\n\nExamples:\n")
-		writeTabbed(&sb, func(w *tabwriter.Writer) {
-			writeTabLines(w, []string{
-				"• /rate USD VES",
-			})
-		})
+		sb.WriteString("\nExamples:\n")
+		sb.WriteString("• /rate USD VES")
 
 		return sb.String()
 	}
@@ -258,32 +179,20 @@ func HelpMessage(lang Language) string {
 	var sb strings.Builder
 	sb.WriteString("📖 Comandos de ChiguiCifras\n\n") //nolint:misspell // Spanish copy
 	sb.WriteString("Consultas de tasas:\n")
-	writeTabbed(&sb, func(w *tabwriter.Writer) {
-		writeTabLines(w, []string{
-			"• /tasa <base> [destino]\tObtener una tasa de cambio",
-			"• /tasas <base>\tListar todas las tasas de una moneda",
-			"• /monedas\tListar monedas disponibles",
-		})
-	})
+	sb.WriteString("• /tasa <base> [destino] - Obtener una tasa de cambio\n")
+	sb.WriteString("• /tasas <base> - Listar todas las tasas de una moneda\n")
+	sb.WriteString("• /monedas - Listar monedas disponibles\n")
 
-	sb.WriteString("\n\nAtajos VES:\n")
-	writeTabbed(&sb, func(w *tabwriter.Writer) {
-		writeTabLines(w, []string{
-			"• /dolar\tUSD/VES",
-			"• /euro\tEUR/VES",
-			"• /usdt\tUSDT/VES",
-			"• /rublo\tRUB/VES",
-			"• /lira\tTRY/VES",
-			"• /yuan\tCNY/VES",
-		})
-	})
+	sb.WriteString("\nAtajos VES:\n")
+	sb.WriteString("• /dolar - USD/VES\n")
+	sb.WriteString("• /euro - EUR/VES\n")
+	sb.WriteString("• /usdt - USDT/VES\n")
+	sb.WriteString("• /rublo - RUB/VES\n")
+	sb.WriteString("• /lira - TRY/VES\n")
+	sb.WriteString("• /yuan - CNY/VES\n")
 
-	sb.WriteString("\n\nEjemplos:\n")
-	writeTabbed(&sb, func(w *tabwriter.Writer) {
-		writeTabLines(w, []string{
-			"• /tasa USD VES",
-		})
-	})
+	sb.WriteString("\nEjemplos:\n")
+	sb.WriteString("• /tasa USD VES")
 
 	return sb.String()
 }

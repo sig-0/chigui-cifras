@@ -39,10 +39,9 @@ func TestFormatter_FormatRate(t *testing.T) {
 		assert.Contains(t, message, "BCV")
 		assert.Contains(t, message, "Type:")
 		assert.Contains(t, message, "MID")
-		assert.Contains(t, message, "As of:")
+		assert.Contains(t, message, "Effective:")
 		assert.Contains(t, message, "2026-01-02 11:04 VET")
-		assert.Contains(t, message, "Fetched:")
-		assert.Contains(t, message, "2026-01-02 11:05 VET")
+		assert.NotContains(t, message, "Fetched:")
 	})
 
 	t.Run("spanish", func(t *testing.T) {
@@ -58,10 +57,9 @@ func TestFormatter_FormatRate(t *testing.T) {
 		assert.Contains(t, message, "BCV")
 		assert.Contains(t, message, "Tipo:")
 		assert.Contains(t, message, "MID")
-		assert.Contains(t, message, "Fecha:")
+		assert.Contains(t, message, "Efectivo:")
 		assert.Contains(t, message, "2026-01-02 11:04 VET")
-		assert.Contains(t, message, "Actualizado:")
-		assert.Contains(t, message, "2026-01-02 11:05 VET")
+		assert.NotContains(t, message, "Actualizado:")
 	})
 }
 
@@ -110,17 +108,13 @@ func TestFormatter_FormatRates(t *testing.T) {
 		message := FormatRates(rates, LanguageEN)
 
 		assert.Contains(t, message, "Rates for USD")
-		assert.Contains(t, message, "Target")
-		assert.Contains(t, message, "Rate")
-		assert.Contains(t, message, "Source")
-		assert.Contains(t, message, "Type")
 		assert.Contains(t, message, "VES")
 		assert.Contains(t, message, "40.0000")
 		assert.Contains(t, message, "EUR")
 		assert.Contains(t, message, "0.9000")
 		assert.Contains(t, message, "BCV")
 		assert.Contains(t, message, "MID")
-		assert.Contains(t, message, "As of:")
+		assert.Contains(t, message, "Effective:")
 		assert.Contains(t, message, "2026-01-02 11:04 VET")
 	})
 
@@ -130,17 +124,13 @@ func TestFormatter_FormatRates(t *testing.T) {
 		message := FormatRates(rates, LanguageES)
 
 		assert.Contains(t, message, "Tasas de USD")
-		assert.Contains(t, message, "Destino")
-		assert.Contains(t, message, "Tasa")
-		assert.Contains(t, message, "Fuente")
-		assert.Contains(t, message, "Tipo")
 		assert.Contains(t, message, "VES")
 		assert.Contains(t, message, "40.0000")
 		assert.Contains(t, message, "EUR")
 		assert.Contains(t, message, "0.9000")
 		assert.Contains(t, message, "BCV")
 		assert.Contains(t, message, "MID")
-		assert.Contains(t, message, "Fecha:")
+		assert.Contains(t, message, "Efectivo:")
 		assert.Contains(t, message, "2026-01-02 11:04 VET")
 	})
 }
@@ -160,8 +150,6 @@ func TestFormatter_FormatCurrencies(t *testing.T) {
 		message := FormatCurrencies(currencies, LanguageEN)
 
 		assert.Contains(t, message, "Supported currencies")
-		assert.Contains(t, message, "Currency")
-		assert.Contains(t, message, "Emoji")
 		assert.Contains(t, message, "USD")
 		assert.Contains(t, message, "VES")
 		assert.Contains(t, message, "EUR")
@@ -173,8 +161,6 @@ func TestFormatter_FormatCurrencies(t *testing.T) {
 		message := FormatCurrencies(currencies, LanguageES)
 
 		assert.Contains(t, message, "Monedas soportadas")
-		assert.Contains(t, message, "Moneda")
-		assert.Contains(t, message, "Emoji")
 		assert.Contains(t, message, "USD")
 		assert.Contains(t, message, "VES")
 		assert.Contains(t, message, "EUR")

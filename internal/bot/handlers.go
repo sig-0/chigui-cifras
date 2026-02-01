@@ -8,6 +8,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/sig-0/fxrates/provider/currencies"
+	"github.com/sig-0/fxrates/storage/types"
 
 	"github.com/sig-0/chigui-cifras/internal/fxrates"
 )
@@ -69,7 +70,8 @@ func (h *FxHandler) Rate(ctx context.Context, b *bot.Bot, update *models.Update)
 		return
 	}
 
-	if len(rates.Results) == 0 {
+	rate := selectPreferredRate(rates.Results)
+	if rate == nil {
 		if lang == LanguageEN {
 			h.reply(ctx, b, update, "No rates found for "+base+"/"+target)
 		} else {
@@ -79,7 +81,7 @@ func (h *FxHandler) Rate(ctx context.Context, b *bot.Bot, update *models.Update)
 		return
 	}
 
-	h.reply(ctx, b, update, FormatRate(rates.Results[0], lang))
+	h.reply(ctx, b, update, FormatRate(*rate, lang))
 }
 
 // Rates handles the /tasas command
@@ -188,16 +190,16 @@ func (h *FxHandler) InlineQuery(ctx context.Context, b *bot.Bot, update *models.
 		return
 	}
 
-	if len(rates.Results) == 0 {
+	rate := selectPreferredRate(rates.Results)
+	if rate == nil {
 		h.answerInlineEmpty(ctx, b, inlineQuery, lang, base, target)
 
 		return
 	}
 
-	rate := rates.Results[0]
 	title := fmt.Sprintf("%s/%s", rate.Base, rate.Target)
 	description := fmt.Sprintf("%.4f (%s, %s)", rate.Rate, rate.Source, rate.RateType)
-	message := FormatRate(rate, lang)
+	message := FormatRate(*rate, lang)
 
 	h.answerInlineResults(ctx, b, inlineQuery, []models.InlineQueryResult{
 		&models.InlineQueryResultArticle{
@@ -221,13 +223,14 @@ func (h *FxHandler) rateShortcut(ctx context.Context, b *bot.Bot, update *models
 		return
 	}
 
-	if len(rates.Results) == 0 {
+	rate := selectPreferredRate(rates.Results)
+	if rate == nil {
 		h.reply(ctx, b, update, "No se encontraron tasas para "+base+"/"+target)
 
 		return
 	}
 
-	h.reply(ctx, b, update, FormatRate(rates.Results[0], LanguageES))
+	h.reply(ctx, b, update, FormatRate(*rate, LanguageES))
 }
 
 func (h *FxHandler) parseArgs(text string) []string {
@@ -386,6 +389,45 @@ func (h *FxHandler) answerInlineResults(
 
 func inlineResultID(title string) string {
 	return strings.ReplaceAll(strings.ToLower(title), "/", "-")
+}
+
+// selectPreferredRate selects the best rate from the results based on the currency pair.
+// For fiat currencies (USD, EUR, etc.), it prefers MID rate from BCV.
+// For crypto (USDT), it prefers whatever is available (typically P2P)
+func selectPreferredRate(rates []fxrates.ExchangeRate) *fxrates.ExchangeRate {
+	if len(rates) == 0 {
+		return nil
+	}
+
+	// For single result, just return it
+	if len(rates) == 1 {
+		return &rates[0]
+	}
+
+	base := rates[0].Base
+
+	// For fiat currencies, prefer BCV MID rate
+	isFiat := base == currencies.USD || base == currencies.EUR ||
+		base == currencies.RUB || base == currencies.TRY || base == currencies.CNY
+
+	if isFiat {
+		// First try: BCV + MID
+		for i := range rates {
+			if rates[i].Source == types.SourceBCV && rates[i].RateType == types.RateTypeMID {
+				return &rates[i]
+			}
+		}
+
+		// Second try: any MID rate
+		for i := range rates {
+			if rates[i].RateType == types.RateTypeMID {
+				return &rates[i]
+			}
+		}
+	}
+
+	// Default: return first result
+	return &rates[0]
 }
 
 func parseInlineQuery(query string) (string, string, bool) {
