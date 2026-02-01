@@ -209,8 +209,9 @@ func TestClient_Errors(t *testing.T) {
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte("{"))
 
-			_, _ = w.Write([]byte("{"))
+			require.NoError(t, err)
 		}))
 
 		t.Cleanup(srv.Close)
