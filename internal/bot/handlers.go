@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/go-telegram/bot"
@@ -17,12 +18,14 @@ import (
 // FxHandler holds command handler and their dependencies
 type FxHandler struct {
 	fxClient *fxrates.Client
+	logger   *slog.Logger
 }
 
 // NewHandlers creates a new FxHandler instance
-func NewHandlers(fxClient *fxrates.Client) *FxHandler {
+func NewHandlers(fxClient *fxrates.Client, logger *slog.Logger) *FxHandler {
 	return &FxHandler{
 		fxClient: fxClient,
+		logger:   logger,
 	}
 }
 
@@ -284,13 +287,21 @@ func (h *FxHandler) languageForInline(query *models.InlineQuery) Language {
 }
 
 func (h *FxHandler) reply(ctx context.Context, b *bot.Bot, update *models.Update, text string) {
+	h.logger.Debug("sending reply",
+		"chat_id", update.Message.Chat.ID,
+		"text_length", len(text),
+	)
+
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:    update.Message.Chat.ID,
 		Text:      text,
 		ParseMode: models.ParseModeMarkdown,
 	})
 	if err != nil {
-		return
+		h.logger.Error("failed to send message",
+			"chat_id", update.Message.Chat.ID,
+			"error", err,
+		)
 	}
 }
 

@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +10,7 @@ import (
 func TestHandler_ParseArgs(t *testing.T) {
 	t.Parallel()
 
-	h := NewHandlers(nil)
+	h := NewHandlers(nil, slog.Default())
 
 	assert.Nil(t, h.parseArgs("/rate"))
 	assert.Equal(t, []string{"USD", "VES"}, h.parseArgs("/rate USD VES"))
@@ -19,7 +20,7 @@ func TestHandler_ParseArgs(t *testing.T) {
 func TestHandler_CommandName(t *testing.T) {
 	t.Parallel()
 
-	h := NewHandlers(nil)
+	h := NewHandlers(nil, slog.Default())
 
 	assert.Equal(t, "/start", h.commandName("/start@ChiguiBot"))
 	assert.Equal(t, "/start", h.commandName("/START extra"))
@@ -29,7 +30,7 @@ func TestHandler_CommandName(t *testing.T) {
 func TestHandler_LanguageForCommand(t *testing.T) {
 	t.Parallel()
 
-	h := NewHandlers(nil)
+	h := NewHandlers(nil, slog.Default())
 
 	assert.Equal(t, LanguageEN, h.languageForCommand("/start"))
 	assert.Equal(t, LanguageEN, h.languageForCommand("/help@bot"))

@@ -165,7 +165,15 @@ func runWebhookMode(
 
 	// Set up the mux handlers
 	mux := http.NewServeMux()
-	mux.Handle(webhookPath, tgBot.WebhookHandler())
+	mux.Handle(webhookPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger.Debug("received webhook request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"content_length", r.ContentLength,
+		)
+
+		tgBot.WebhookHandler().ServeHTTP(w, r)
+	}))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})

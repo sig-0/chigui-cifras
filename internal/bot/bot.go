@@ -31,7 +31,7 @@ func New(
 	logger *slog.Logger,
 	settings Settings,
 ) (*Bot, error) {
-	handlers := NewHandlers(fxClient)
+	handlers := NewHandlers(fxClient, logger)
 
 	opts := []bot.Option{
 		bot.WithDefaultHandler(func(ctx context.Context, b *bot.Bot, update *models.Update) {

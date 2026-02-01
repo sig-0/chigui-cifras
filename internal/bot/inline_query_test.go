@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -55,7 +56,7 @@ func TestInlineQuery_ValidRateEnglish(t *testing.T) {
 	t.Cleanup(tgServer.Close)
 
 	client := fxrates.NewClient(fxServer.URL, time.Second)
-	h := NewHandlers(client)
+	h := NewHandlers(client, slog.Default())
 	b := newTelegramBot(t, tgServer.URL)
 
 	update := &models.Update{
@@ -95,7 +96,7 @@ func TestInlineQuery_HelpEnglish(t *testing.T) {
 	tgServer, requests := newInlineServer(t)
 	t.Cleanup(tgServer.Close)
 
-	h := NewHandlers(nil)
+	h := NewHandlers(nil, slog.Default())
 	b := newTelegramBot(t, tgServer.URL)
 
 	update := &models.Update{
@@ -135,7 +136,7 @@ func TestInlineQuery_NoResultsSpanish(t *testing.T) {
 	t.Cleanup(tgServer.Close)
 
 	client := fxrates.NewClient(fxServer.URL, time.Second)
-	h := NewHandlers(client)
+	h := NewHandlers(client, slog.Default())
 	b := newTelegramBot(t, tgServer.URL)
 
 	update := &models.Update{
@@ -171,7 +172,7 @@ func TestInlineQuery_ErrorSpanish(t *testing.T) {
 	t.Cleanup(tgServer.Close)
 
 	client := fxrates.NewClient(fxServer.URL, time.Second)
-	h := NewHandlers(client)
+	h := NewHandlers(client, slog.Default())
 	b := newTelegramBot(t, tgServer.URL)
 
 	update := &models.Update{
@@ -259,7 +260,7 @@ func TestInlineQuery_ParseInlineQuery(t *testing.T) {
 func TestInlineQuery_LanguageForInline(t *testing.T) {
 	t.Parallel()
 
-	h := NewHandlers(nil)
+	h := NewHandlers(nil, slog.Default())
 
 	assert.Equal(t, LanguageES, h.languageForInline(nil))
 	assert.Equal(t, LanguageES, h.languageForInline(&models.InlineQuery{}))
