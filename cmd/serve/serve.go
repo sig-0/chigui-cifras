@@ -140,8 +140,8 @@ func runWebhookMode(
 	group, gCtx := errgroup.WithContext(ctx)
 
 	// Delete any existing webhook to clear stale configuration
-	if _, err := tgBot.DeleteWebhook(gCtx, false); err != nil {
-		return fmt.Errorf("unable to delete existing webhook: %w", err)
+	if _, err := tgBot.DeleteWebhook(ctx, false); err != nil {
+		logger.Warn("unable to delete existing webhook", "error", err)
 	}
 
 	_, setErr := tgBot.SetWebhook(
