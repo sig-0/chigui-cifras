@@ -293,9 +293,8 @@ func (h *FxHandler) reply(ctx context.Context, b *bot.Bot, update *models.Update
 	)
 
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:    update.Message.Chat.ID,
-		Text:      text,
-		ParseMode: models.ParseModeMarkdown,
+		ChatID: update.Message.Chat.ID,
+		Text:   text,
 	})
 	if err != nil {
 		h.logger.Error("failed to send message",
