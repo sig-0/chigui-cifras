@@ -28,8 +28,7 @@ import (
 type serveCfg struct {
 	config *config.Config
 
-	configPath        string
-	webhookListenAddr string
+	configPath string
 }
 
 // NewServeCmd creates the serve subcommand
@@ -59,10 +58,10 @@ func (c *serveCfg) registerFlags(fs *flag.FlagSet) {
 	)
 
 	fs.StringVar(
-		&c.webhookListenAddr,
+		&c.config.ListenAddress,
 		"listen",
-		"",
-		"webhook listen address",
+		config.DefaultListenAddress,
+		"the IP:PORT URL for the server",
 	)
 }
 
@@ -93,11 +92,6 @@ func (c *serveCfg) exec(ctx context.Context, _ []string) error {
 
 	if err := applyEnv(c.config); err != nil {
 		return err
-	}
-
-	// Set the webhook listen address (for Telegram)
-	if c.webhookListenAddr != "" {
-		c.config.Telegram.WebhookListenAddr = c.webhookListenAddr
 	}
 
 	if err := config.ValidateConfig(c.config); err != nil {
@@ -134,7 +128,7 @@ func (c *serveCfg) exec(ctx context.Context, _ []string) error {
 		return runWebhookMode(runCtx, tgBot, logger, c.config)
 	}
 
-	return runPollingMode(runCtx, tgBot, logger)
+	return runPollingMode(runCtx, tgBot, logger, c.config)
 }
 
 func runWebhookMode(
@@ -172,7 +166,7 @@ func runWebhookMode(
 	})
 
 	server := &http.Server{
-		Addr:              cfg.Telegram.WebhookListenAddr,
+		Addr:              cfg.ListenAddress,
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
@@ -182,7 +176,7 @@ func runWebhookMode(
 
 		logger.Info(
 			"starting webhook listener",
-			"listen_addr", cfg.Telegram.WebhookListenAddr,
+			"listen_addr", cfg.ListenAddress,
 			"webhook_url", cfg.Telegram.WebhookURL,
 			"webhook_path", webhookPath,
 		)
@@ -217,12 +211,50 @@ func runPollingMode(
 	ctx context.Context,
 	tgBot *bot.Bot,
 	logger *slog.Logger,
+	cfg *config.Config,
 ) error {
 	group, gCtx := errgroup.WithContext(ctx)
 
 	if _, err := tgBot.DeleteWebhook(gCtx, true); err != nil {
 		return fmt.Errorf("unable to delete webhook: %w", err)
 	}
+
+	// Set up a minimal HTTP server for the health endpoint,
+	// since the polling mode does not need an HTTP handler to operate
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	server := &http.Server{
+		Addr:              cfg.ListenAddress,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	group.Go(func() error {
+		defer logger.Info("health server shut down")
+
+		logger.Info(
+			"starting health server",
+			"listen_addr", cfg.ListenAddress,
+		)
+
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+
+		return nil
+	})
+
+	group.Go(func() error {
+		<-gCtx.Done()
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		return server.Shutdown(shutdownCtx)
+	})
 
 	group.Go(func() error {
 		logger.Info("starting telegram bot in polling mode")
@@ -241,10 +273,6 @@ func applyEnv(cfg *config.Config) error {
 
 	if v, ok := os.LookupEnv(env.Prefix + "_" + env.WebhookURLSuffix); ok {
 		cfg.Telegram.WebhookURL = v
-	}
-
-	if v, ok := os.LookupEnv(env.Prefix + "_" + env.WebhookListenAddrSuffix); ok {
-		cfg.Telegram.WebhookListenAddr = v
 	}
 
 	if v, ok := os.LookupEnv(env.Prefix + "_" + env.WebhookSecretTokenSuffix); ok {

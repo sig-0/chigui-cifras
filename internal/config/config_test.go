@@ -14,9 +14,8 @@ func TestConfig_ValidateConfig(t *testing.T) {
 	t.Parallel()
 
 	const (
-		testWebhookURL    = "https://example.com/webhook"
-		testSecretToken   = "secret"
-		testWebhookListen = "0.0.0.0:8080"
+		testWebhookURL  = "https://example.com/webhook"
+		testSecretToken = "secret"
 	)
 
 	validConfig := func() *Config {
@@ -43,6 +42,20 @@ func TestConfig_ValidateConfig(t *testing.T) {
 			err: errMissingTelegramToken,
 		},
 		{
+			name: "missing listen address",
+			mutate: func(cfg *Config) {
+				cfg.ListenAddress = ""
+			},
+			err: errMissingListenAddr,
+		},
+		{
+			name: "invalid listen address",
+			mutate: func(cfg *Config) {
+				cfg.ListenAddress = "invalid"
+			},
+			errContains: "invalid listen address",
+		},
+		{
 			name: "invalid webhook url",
 			mutate: func(cfg *Config) {
 				cfg.Telegram.WebhookURL = "not-a-url"
@@ -57,24 +70,6 @@ func TestConfig_ValidateConfig(t *testing.T) {
 			errContains: "webhook url must use https",
 		},
 		{
-			name: "missing webhook listen address",
-			mutate: func(cfg *Config) {
-				cfg.Telegram.WebhookURL = testWebhookURL
-				cfg.Telegram.WebhookListenAddr = ""
-				cfg.Telegram.WebhookSecretToken = testSecretToken
-			},
-			err: errMissingWebhookListenAddr,
-		},
-		{
-			name: "invalid webhook listen address",
-			mutate: func(cfg *Config) {
-				cfg.Telegram.WebhookURL = testWebhookURL
-				cfg.Telegram.WebhookListenAddr = "invalid"
-				cfg.Telegram.WebhookSecretToken = testSecretToken
-			},
-			errContains: "invalid webhook listen address",
-		},
-		{
 			name: "missing webhook secret token",
 			mutate: func(cfg *Config) {
 				cfg.Telegram.WebhookURL = testWebhookURL
@@ -86,7 +81,6 @@ func TestConfig_ValidateConfig(t *testing.T) {
 			name: "valid webhook configuration",
 			mutate: func(cfg *Config) {
 				cfg.Telegram.WebhookURL = testWebhookURL
-				cfg.Telegram.WebhookListenAddr = testWebhookListen
 				cfg.Telegram.WebhookSecretToken = testSecretToken
 			},
 		},
@@ -169,10 +163,10 @@ timeout = "12s"
 
 	require.NoError(t, err)
 
+	assert.Equal(t, DefaultListenAddress, cfg.ListenAddress)
 	assert.Equal(t, "token", cfg.Telegram.Token)
 	assert.Equal(t, "https://example.com/webhook", cfg.Telegram.WebhookURL)
 	assert.Equal(t, "secret", cfg.Telegram.WebhookSecretToken)
-	assert.Equal(t, DefaultWebhookListenAddr, cfg.Telegram.WebhookListenAddr)
 
 	assert.Equal(t, "http://example.com", cfg.FXRates.BaseURL)
 	assert.Equal(t, 12*time.Second, cfg.FXRates.Timeout)

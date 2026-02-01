@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DefaultWebhookListenAddr = "0.0.0.0:8080"
+	DefaultListenAddress = "0.0.0.0:8080"
 
 	DefaultFXRatesURL = "https://api.ojoporciento.com"
 	DefaultFXTimeout  = 10 * time.Second
@@ -21,7 +21,7 @@ const (
 
 var (
 	errMissingTelegramToken      = errors.New("missing telegram token")
-	errMissingWebhookListenAddr  = errors.New("missing webhook listen address")
+	errMissingListenAddr         = errors.New("missing listen address")
 	errMissingWebhookSecretToken = errors.New("missing webhook secret token")
 	errMissingFXRatesBaseURL     = errors.New("missing fxrates base url")
 	errFXRatesTimeoutNonPositive = errors.New("fxrates timeout must be positive")
@@ -29,15 +29,15 @@ var (
 
 // Config holds all application configuration
 type Config struct {
-	Telegram TelegramConfig `toml:"telegram"`
-	FXRates  FXRatesConfig  `toml:"fxrates"`
+	ListenAddress string         `toml:"listen_address"`
+	Telegram      TelegramConfig `toml:"telegram"`
+	FXRates       FXRatesConfig  `toml:"fxrates"`
 }
 
 // TelegramConfig holds Telegram bot settings
 type TelegramConfig struct {
 	Token              string `toml:"token"`
 	WebhookURL         string `toml:"webhook_url"`
-	WebhookListenAddr  string `toml:"webhook_listen_addr"`
 	WebhookSecretToken string `toml:"webhook_secret_token"`
 }
 
@@ -50,9 +50,7 @@ type FXRatesConfig struct {
 // DefaultConfig returns a Config with default values
 func DefaultConfig() *Config {
 	return &Config{
-		Telegram: TelegramConfig{
-			WebhookListenAddr: DefaultWebhookListenAddr,
-		},
+		ListenAddress: DefaultListenAddress,
 		FXRates: FXRatesConfig{
 			BaseURL: DefaultFXRatesURL,
 			Timeout: DefaultFXTimeout,
@@ -64,6 +62,14 @@ func DefaultConfig() *Config {
 func ValidateConfig(config *Config) error {
 	if strings.TrimSpace(config.Telegram.Token) == "" {
 		return errMissingTelegramToken
+	}
+
+	if strings.TrimSpace(config.ListenAddress) == "" {
+		return errMissingListenAddr
+	}
+
+	if _, _, splitErr := net.SplitHostPort(config.ListenAddress); splitErr != nil {
+		return fmt.Errorf("invalid listen address: %q", config.ListenAddress)
 	}
 
 	if strings.TrimSpace(config.FXRates.BaseURL) == "" {
@@ -94,14 +100,6 @@ func ValidateConfig(config *Config) error {
 
 	if parsedWebhookURL.Scheme != "https" {
 		return fmt.Errorf("webhook url must use https: %q", config.Telegram.WebhookURL)
-	}
-
-	if strings.TrimSpace(config.Telegram.WebhookListenAddr) == "" {
-		return errMissingWebhookListenAddr
-	}
-
-	if _, _, splitErr := net.SplitHostPort(config.Telegram.WebhookListenAddr); splitErr != nil {
-		return fmt.Errorf("invalid webhook listen address: %q", config.Telegram.WebhookListenAddr)
 	}
 
 	if strings.TrimSpace(config.Telegram.WebhookSecretToken) == "" {
