@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -129,20 +130,33 @@ func (c *serveCfg) exec(ctx context.Context, _ []string) error {
 	)
 	defer cancelFn()
 
-	group, gCtx := errgroup.WithContext(runCtx)
+	if strings.TrimSpace(c.config.Telegram.WebhookURL) != "" {
+		return runWebhookMode(runCtx, tgBot, logger, c.config)
+	}
+
+	return runPollingMode(runCtx, tgBot, logger)
+}
+
+func runWebhookMode(
+	ctx context.Context,
+	tgBot *bot.Bot,
+	logger *slog.Logger,
+	cfg *config.Config,
+) error {
+	group, gCtx := errgroup.WithContext(ctx)
 
 	_, setErr := tgBot.SetWebhook(
 		gCtx,
-		c.config.Telegram.WebhookURL,
-		c.config.Telegram.WebhookSecretToken,
+		cfg.Telegram.WebhookURL,
+		cfg.Telegram.WebhookSecretToken,
 	)
 	if setErr != nil {
 		return fmt.Errorf("unable to set webhook: %w", setErr)
 	}
 
-	parsedWebhookURL, err := url.Parse(c.config.Telegram.WebhookURL)
+	parsedWebhookURL, err := url.Parse(cfg.Telegram.WebhookURL)
 	if err != nil || !parsedWebhookURL.IsAbs() {
-		return fmt.Errorf("invalid webhook url: %q", c.config.Telegram.WebhookURL)
+		return fmt.Errorf("invalid webhook url: %q", cfg.Telegram.WebhookURL)
 	}
 
 	webhookPath := parsedWebhookURL.Path
@@ -158,7 +172,7 @@ func (c *serveCfg) exec(ctx context.Context, _ []string) error {
 	})
 
 	server := &http.Server{
-		Addr:              c.config.Telegram.WebhookListenAddr,
+		Addr:              cfg.Telegram.WebhookListenAddr,
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
@@ -168,8 +182,8 @@ func (c *serveCfg) exec(ctx context.Context, _ []string) error {
 
 		logger.Info(
 			"starting webhook listener",
-			"listen_addr", c.config.Telegram.WebhookListenAddr,
-			"webhook_url", c.config.Telegram.WebhookURL,
+			"listen_addr", cfg.Telegram.WebhookListenAddr,
+			"webhook_url", cfg.Telegram.WebhookURL,
 			"webhook_path", webhookPath,
 		)
 
@@ -191,7 +205,28 @@ func (c *serveCfg) exec(ctx context.Context, _ []string) error {
 
 	group.Go(func() error {
 		logger.Info("starting telegram bot in webhook mode")
-		tgBot.Start(gCtx)
+		tgBot.StartWebhook(gCtx)
+
+		return nil
+	})
+
+	return group.Wait()
+}
+
+func runPollingMode(
+	ctx context.Context,
+	tgBot *bot.Bot,
+	logger *slog.Logger,
+) error {
+	group, gCtx := errgroup.WithContext(ctx)
+
+	if _, err := tgBot.DeleteWebhook(gCtx, true); err != nil {
+		return fmt.Errorf("unable to delete webhook: %w", err)
+	}
+
+	group.Go(func() error {
+		logger.Info("starting telegram bot in polling mode")
+		tgBot.StartPolling(gCtx)
 
 		return nil
 	})

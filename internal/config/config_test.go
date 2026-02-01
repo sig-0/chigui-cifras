@@ -13,13 +13,16 @@ import (
 func TestConfig_ValidateConfig(t *testing.T) {
 	t.Parallel()
 
+	const (
+		testWebhookURL    = "https://example.com/webhook"
+		testSecretToken   = "secret"
+		testWebhookListen = "0.0.0.0:8080"
+	)
+
 	validConfig := func() *Config {
 		cfg := DefaultConfig()
 
 		cfg.Telegram.Token = "token"
-		cfg.Telegram.WebhookURL = "https://example.com/webhook"
-		cfg.Telegram.WebhookListenAddr = "0.0.0.0:8080"
-		cfg.Telegram.WebhookSecretToken = "secret"
 		cfg.FXRates.BaseURL = "https://api.example.com"
 		cfg.FXRates.Timeout = time.Second
 
@@ -40,13 +43,6 @@ func TestConfig_ValidateConfig(t *testing.T) {
 			err: errMissingTelegramToken,
 		},
 		{
-			name: "missing webhook url",
-			mutate: func(cfg *Config) {
-				cfg.Telegram.WebhookURL = ""
-			},
-			err: errMissingWebhookURL,
-		},
-		{
 			name: "invalid webhook url",
 			mutate: func(cfg *Config) {
 				cfg.Telegram.WebhookURL = "not-a-url"
@@ -63,23 +59,36 @@ func TestConfig_ValidateConfig(t *testing.T) {
 		{
 			name: "missing webhook listen address",
 			mutate: func(cfg *Config) {
+				cfg.Telegram.WebhookURL = testWebhookURL
 				cfg.Telegram.WebhookListenAddr = ""
+				cfg.Telegram.WebhookSecretToken = testSecretToken
 			},
 			err: errMissingWebhookListenAddr,
 		},
 		{
 			name: "invalid webhook listen address",
 			mutate: func(cfg *Config) {
+				cfg.Telegram.WebhookURL = testWebhookURL
 				cfg.Telegram.WebhookListenAddr = "invalid"
+				cfg.Telegram.WebhookSecretToken = testSecretToken
 			},
 			errContains: "invalid webhook listen address",
 		},
 		{
 			name: "missing webhook secret token",
 			mutate: func(cfg *Config) {
+				cfg.Telegram.WebhookURL = testWebhookURL
 				cfg.Telegram.WebhookSecretToken = ""
 			},
 			err: errMissingWebhookSecretToken,
+		},
+		{
+			name: "valid webhook configuration",
+			mutate: func(cfg *Config) {
+				cfg.Telegram.WebhookURL = testWebhookURL
+				cfg.Telegram.WebhookListenAddr = testWebhookListen
+				cfg.Telegram.WebhookSecretToken = testSecretToken
+			},
 		},
 		{
 			name: "missing fxrates base url",

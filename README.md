@@ -37,9 +37,9 @@ La configuración parte de valores por defecto y se puede sobrescribir con un TO
 Variables principales:
 
 - `CHIGUI_TELEGRAM_TOKEN` (requerida)
-- `CHIGUI_WEBHOOK_URL` (requerida, **HTTPS**)
-- `CHIGUI_WEBHOOK_SECRET_TOKEN` (requerida)
-- `CHIGUI_WEBHOOK_LISTEN_ADDR` (opcional, default `0.0.0.0:8080`)
+- `CHIGUI_WEBHOOK_URL` (opcional, **HTTPS** para modo webhook)
+- `CHIGUI_WEBHOOK_SECRET_TOKEN` (requerida si usas webhook)
+- `CHIGUI_WEBHOOK_LISTEN_ADDR` (opcional, default `0.0.0.0:8080`, solo webhook)
 - `CHIGUI_FXRATES_URL` (opcional, default `https://api.ojoporciento.com`)
 - `CHIGUI_FXRATES_TIMEOUT` (opcional, default `10s`)
 
@@ -47,6 +47,8 @@ Flags disponibles:
 
 - `--config` (ruta a TOML)
 - `--listen` (override del listen addr)
+
+Si `CHIGUI_WEBHOOK_URL` no está definida, el bot usa long polling y elimina cualquier webhook previo.
 
 ## Build y ejecución
 

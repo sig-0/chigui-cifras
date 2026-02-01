@@ -87,9 +87,14 @@ func (b *Bot) registerHandlers() {
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/yuan", bot.MatchTypePrefix, b.handler.Yuan)
 }
 
-// Start begins webhook mode dispatching for updates
-func (b *Bot) Start(ctx context.Context) {
+// StartWebhook begins webhook mode dispatching for updates
+func (b *Bot) StartWebhook(ctx context.Context) {
 	b.bot.StartWebhook(ctx)
+}
+
+// StartPolling begins long polling mode dispatching for updates
+func (b *Bot) StartPolling(ctx context.Context) {
+	b.bot.Start(ctx)
 }
 
 // WebhookHandler returns an HTTP handler for Telegram webhook updates
@@ -102,6 +107,13 @@ func (b *Bot) SetWebhook(ctx context.Context, url, secretToken string) (bool, er
 	return b.bot.SetWebhook(ctx, &bot.SetWebhookParams{
 		URL:         url,
 		SecretToken: secretToken,
+	})
+}
+
+// DeleteWebhook deletes the current webhook
+func (b *Bot) DeleteWebhook(ctx context.Context, dropPendingUpdates bool) (bool, error) {
+	return b.bot.DeleteWebhook(ctx, &bot.DeleteWebhookParams{
+		DropPendingUpdates: dropPendingUpdates,
 	})
 }
 

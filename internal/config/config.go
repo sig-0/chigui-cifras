@@ -21,7 +21,6 @@ const (
 
 var (
 	errMissingTelegramToken      = errors.New("missing telegram token")
-	errMissingWebhookURL         = errors.New("missing webhook url")
 	errMissingWebhookListenAddr  = errors.New("missing webhook listen address")
 	errMissingWebhookSecretToken = errors.New("missing webhook secret token")
 	errMissingFXRatesBaseURL     = errors.New("missing fxrates base url")
@@ -67,8 +66,25 @@ func ValidateConfig(config *Config) error {
 		return errMissingTelegramToken
 	}
 
+	if strings.TrimSpace(config.FXRates.BaseURL) == "" {
+		return errMissingFXRatesBaseURL
+	}
+
+	parsedFXURL, err := url.Parse(config.FXRates.BaseURL)
+	if err != nil || !parsedFXURL.IsAbs() {
+		return fmt.Errorf("invalid fxrates base url: %q", config.FXRates.BaseURL)
+	}
+
+	if parsedFXURL.Scheme != "https" && parsedFXURL.Scheme != "http" {
+		return fmt.Errorf("fxrates base url must use http or https: %q", config.FXRates.BaseURL)
+	}
+
+	if config.FXRates.Timeout <= 0 {
+		return errFXRatesTimeoutNonPositive
+	}
+
 	if strings.TrimSpace(config.Telegram.WebhookURL) == "" {
-		return errMissingWebhookURL
+		return nil
 	}
 
 	parsedWebhookURL, err := url.Parse(config.Telegram.WebhookURL)
@@ -90,23 +106,6 @@ func ValidateConfig(config *Config) error {
 
 	if strings.TrimSpace(config.Telegram.WebhookSecretToken) == "" {
 		return errMissingWebhookSecretToken
-	}
-
-	if strings.TrimSpace(config.FXRates.BaseURL) == "" {
-		return errMissingFXRatesBaseURL
-	}
-
-	parsedFXURL, err := url.Parse(config.FXRates.BaseURL)
-	if err != nil || !parsedFXURL.IsAbs() {
-		return fmt.Errorf("invalid fxrates base url: %q", config.FXRates.BaseURL)
-	}
-
-	if parsedFXURL.Scheme != "https" && parsedFXURL.Scheme != "http" {
-		return fmt.Errorf("fxrates base url must use http or https: %q", config.FXRates.BaseURL)
-	}
-
-	if config.FXRates.Timeout <= 0 {
-		return errFXRatesTimeoutNonPositive
 	}
 
 	return nil
