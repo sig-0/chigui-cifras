@@ -39,7 +39,7 @@ func TestFormatter_FormatTime(t *testing.T) {
 	ts := time.Date(2026, time.January, 2, 15, 4, 0, 0, time.UTC)
 	result := formatTime(ts)
 
-	assert.Equal(t, "02 ene 2026, 11:04", result)
+	assert.Equal(t, "02 ene 2026, 11:04 VET", result)
 }
 
 func TestFormatter_FormatRate(t *testing.T) {
@@ -62,7 +62,7 @@ func TestFormatter_FormatRate(t *testing.T) {
 	assert.Contains(t, message, "Bs")
 	assert.Contains(t, message, "BCV")
 	assert.Contains(t, message, "Tasa media")
-	assert.Contains(t, message, "02 ene 2026, 11:04")
+	assert.Contains(t, message, "02 ene 2026, 11:04 VET")
 }
 
 func TestFormatter_FormatRates(t *testing.T) {
@@ -110,31 +110,32 @@ func TestFormatter_FormatRates(t *testing.T) {
 		assert.Contains(t, message, "<code>0.90</code>")
 		assert.Contains(t, message, "BCV")
 		assert.Contains(t, message, "Tasa media")
-		assert.Contains(t, message, "02 ene 2026, 11:04")
+		assert.Contains(t, message, "02 ene 2026, 11:04 VET")
 	})
 }
 
 func TestFormatter_FormatDashboard(t *testing.T) {
 	t.Parallel()
 
-	rateTime := time.Date(2026, time.February, 1, 12, 0, 0, 0, time.UTC)
+	bcvTime := time.Date(2026, time.February, 1, 12, 0, 0, 0, time.UTC)
+	p2pTime := time.Date(2026, time.February, 1, 14, 30, 0, 0, time.UTC)
 
 	usd := &fxrates.ExchangeRate{
 		Base: types.CurrencyUSD, Target: types.CurrencyVES,
-		Rate: 52.43, RateType: types.RateTypeMID, Source: types.SourceBCV, AsOf: rateTime,
+		Rate: 52.43, RateType: types.RateTypeMID, Source: types.SourceBCV, AsOf: bcvTime,
 	}
 	eur := &fxrates.ExchangeRate{
 		Base: types.CurrencyEUR, Target: types.CurrencyVES,
-		Rate: 56.12, RateType: types.RateTypeMID, Source: types.SourceBCV, AsOf: rateTime,
+		Rate: 56.12, RateType: types.RateTypeMID, Source: types.SourceBCV, AsOf: bcvTime,
 	}
 	usdtRates := []fxrates.ExchangeRate{
 		{
 			Base: types.CurrencyUSDT, Target: types.CurrencyVES,
-			Rate: 51.80, RateType: types.RateTypeBUY, Source: "P2P", AsOf: rateTime,
+			Rate: 51.80, RateType: types.RateTypeBUY, Source: "P2P", AsOf: p2pTime,
 		},
 		{
 			Base: types.CurrencyUSDT, Target: types.CurrencyVES,
-			Rate: 52.10, RateType: types.RateTypeSELL, Source: "P2P", AsOf: rateTime,
+			Rate: 52.10, RateType: types.RateTypeSELL, Source: "P2P", AsOf: p2pTime,
 		},
 	}
 
@@ -150,8 +151,9 @@ func TestFormatter_FormatDashboard(t *testing.T) {
 	assert.Contains(t, message, "<code>51.80</code>")
 	assert.Contains(t, message, "Venta:")
 	assert.Contains(t, message, "<code>52.10</code>")
-	assert.Contains(t, message, "BCV")
-	assert.Contains(t, message, "01 feb 2026, 08:00")
+	// Separate timestamps for BCV and P2P
+	assert.Contains(t, message, "BCV · 01 feb 2026, 08:00 VET")
+	assert.Contains(t, message, "P2P · 01 feb 2026, 10:30 VET")
 }
 
 func TestFormatter_FormatDashboard_Partial(t *testing.T) {

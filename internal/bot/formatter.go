@@ -49,11 +49,11 @@ func spanishMonth(m time.Month) string {
 	return spanishMonths[m-1]
 }
 
-// formatTime formats a UTC time into "02 feb 2026, 15:04" in VET.
+// formatTime formats a UTC time into "DD month YYYY, HH:MM VET"
 func formatTime(value time.Time) string {
 	t := value.In(caracasLocation)
 
-	return fmt.Sprintf("%02d %s %d, %02d:%02d",
+	return fmt.Sprintf("%02d %s %d, %02d:%02d VET",
 		t.Day(), spanishMonth(t.Month()), t.Year(), t.Hour(), t.Minute())
 }
 
@@ -136,26 +136,21 @@ func FormatDashboard(usd, eur *fxrates.ExchangeRate, usdtRates []fxrates.Exchang
 		}
 	}
 
-	// Use first available rate for the timestamp
-	var (
-		asOf   time.Time
-		source string
-	)
+	// Show separate timestamps for BCV and USDT
+	// since they update at different frequencies
+	sb.WriteString("\n")
 
-	switch {
-	case usd != nil:
-		asOf = usd.AsOf
-		source = string(usd.Source)
-	case eur != nil:
-		asOf = eur.AsOf
-		source = string(eur.Source)
-	case len(usdtRates) > 0:
-		asOf = usdtRates[0].AsOf
-		source = string(usdtRates[0].Source)
+	if usd != nil {
+		sb.WriteString(fmt.Sprintf("\U0001F4C5 %s · %s\n",
+			html.EscapeString(string(usd.Source)), formatTime(usd.AsOf)))
+	} else if eur != nil {
+		sb.WriteString(fmt.Sprintf("\U0001F4C5 %s · %s\n",
+			html.EscapeString(string(eur.Source)), formatTime(eur.AsOf)))
 	}
 
-	if !asOf.IsZero() {
-		sb.WriteString(fmt.Sprintf("\n\U0001F4C5 %s · %s", formatTime(asOf), html.EscapeString(source)))
+	if len(usdtRates) > 0 {
+		sb.WriteString(fmt.Sprintf("\U0001F4C5 %s · %s",
+			html.EscapeString(string(usdtRates[0].Source)), formatTime(usdtRates[0].AsOf)))
 	}
 
 	return sb.String()

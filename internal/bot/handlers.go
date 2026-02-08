@@ -67,14 +67,20 @@ func (h *FxHandler) Rate(ctx context.Context, b *bot.Bot, update *models.Update)
 		return
 	}
 
-	rate := selectPreferredRate(rates.Results)
-	if rate == nil {
+	if len(rates.Results) == 0 {
 		h.reply(ctx, b, update, "No se encontraron tasas para "+base+"/"+target)
 
 		return
 	}
 
-	h.reply(ctx, b, update, FormatRate(*rate))
+	// Show all rates when there are multiple (e.g. USDT BUY/SELL)
+	if len(rates.Results) > 1 {
+		h.reply(ctx, b, update, FormatRates(rates.Results))
+
+		return
+	}
+
+	h.reply(ctx, b, update, FormatRate(rates.Results[0]))
 }
 
 // dashboard fetches USD, EUR, and USDT rates in parallel and renders the dashboard
