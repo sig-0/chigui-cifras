@@ -219,6 +219,11 @@ func TestFormatter_HelpMessage(t *testing.T) {
 	assert.Contains(t, message, "/tasa")
 	assert.Contains(t, message, "/dolar")
 	assert.Contains(t, message, "/monedas")
+	assert.Contains(t, message, "/suscribir")
+	assert.Contains(t, message, "/desuscribir")
+	assert.Contains(t, message, "/alerta")
+	assert.Contains(t, message, "/alertas")
+	assert.Contains(t, message, "/borraralerta")
 }
 
 func TestFormatter_ErrorMessage(t *testing.T) {

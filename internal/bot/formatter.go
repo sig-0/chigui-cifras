@@ -213,8 +213,18 @@ func HelpMessage() string {
 	sb.WriteString("• /euro - EUR/VES\n")
 	sb.WriteString("• /usdt - USDT/VES\n")
 
+	sb.WriteString("\n<b>Suscripciones:</b>\n")
+	sb.WriteString("• /suscribir &lt;horario|diario&gt; - Recibir tasas automáticamente\n")
+	sb.WriteString("• /desuscribir - Cancelar suscripción\n")
+
+	sb.WriteString("\n<b>Alertas:</b>\n")
+	sb.WriteString("• /alerta &lt;moneda&gt; &lt;arriba|abajo&gt; &lt;valor&gt; - Crear alerta de precio\n")
+	sb.WriteString("• /alertas - Ver alertas activas\n")
+	sb.WriteString("• /borraralerta &lt;id&gt; - Eliminar una alerta\n")
+
 	sb.WriteString("\n<b>Ejemplos:</b>\n")
-	sb.WriteString("• /tasa USD VES")
+	sb.WriteString("• /tasa USD VES\n")
+	sb.WriteString("• /alerta USD arriba 50")
 
 	return sb.String()
 }
