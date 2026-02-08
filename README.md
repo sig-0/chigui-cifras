@@ -3,7 +3,7 @@
 ## Overview
 
 ChiguiCifras es un bot de Telegram que entrega tasas de cambio en tiempo real para VES (Bolívar venezolano), consumiendo
-la API de [**fxrates**](github.com/sig-0/fxrates).
+la API de [**fxrates**](https://github.com/sig-0/fxrates).
 
 ## Comandos
 
