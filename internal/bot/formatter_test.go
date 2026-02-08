@@ -11,6 +11,7 @@ import (
 	"github.com/sig-0/fxrates/storage/types"
 
 	"github.com/sig-0/chigui-cifras/internal/fxrates"
+	"github.com/sig-0/chigui-cifras/internal/storage"
 )
 
 func TestFormatter_SpanishMonth(t *testing.T) {
@@ -240,4 +241,146 @@ func TestFormatter_GetEmoji(t *testing.T) {
 	emoji := emojiForCurrency(types.CurrencyUSD)
 
 	require.NotEmpty(t, emoji)
+}
+
+func TestFormatter_FormatSubscribed(t *testing.T) {
+	t.Parallel()
+
+	t.Run("hourly", func(t *testing.T) {
+		t.Parallel()
+
+		msg := FormatSubscribed(storage.FrequencyHourly)
+		assert.Contains(t, msg, "Suscrito")
+		assert.Contains(t, msg, "horario")
+	})
+
+	t.Run("daily", func(t *testing.T) {
+		t.Parallel()
+
+		msg := FormatSubscribed(storage.FrequencyDaily)
+		assert.Contains(t, msg, "Suscrito")
+		assert.Contains(t, msg, "diario")
+	})
+}
+
+func TestFormatter_FormatUnsubscribed(t *testing.T) {
+	t.Parallel()
+
+	msg := FormatUnsubscribed()
+	assert.Contains(t, msg, "desuscrito")
+}
+
+func TestFormatter_FormatAlertCreated(t *testing.T) {
+	t.Parallel()
+
+	alert := storage.Alert{
+		ID:        "test123",
+		ChatID:    42,
+		Base:      "USD",
+		Direction: storage.DirectionAbove,
+		Threshold: 55.5,
+		CreatedAt: time.Now(),
+	}
+
+	msg := FormatAlertCreated(alert)
+
+	assert.Contains(t, msg, "Alerta creada")
+	assert.Contains(t, msg, "USD/VES")
+	assert.Contains(t, msg, "por encima de")
+	assert.Contains(t, msg, "55.5000")
+	assert.Contains(t, msg, "test123")
+}
+
+func TestFormatter_FormatAlertCreated_Below(t *testing.T) {
+	t.Parallel()
+
+	alert := storage.Alert{
+		ID:        "abc",
+		Base:      "EUR",
+		Direction: storage.DirectionBelow,
+		Threshold: 50,
+	}
+
+	msg := FormatAlertCreated(alert)
+
+	assert.Contains(t, msg, "por debajo de")
+	assert.Contains(t, msg, "EUR/VES")
+}
+
+func TestFormatter_FormatAlerts(t *testing.T) {
+	t.Parallel()
+
+	alerts := []*storage.Alert{
+		{ID: "a1", Base: "USD", Direction: storage.DirectionAbove, Threshold: 55},
+		{ID: "a2", Base: "EUR", Direction: storage.DirectionBelow, Threshold: 50},
+	}
+
+	msg := FormatAlerts(alerts)
+
+	assert.Contains(t, msg, "alertas activas")
+	assert.Contains(t, msg, "USD/VES")
+	assert.Contains(t, msg, "arriba")
+	assert.Contains(t, msg, "55.0000")
+	assert.Contains(t, msg, "EUR/VES")
+	assert.Contains(t, msg, "abajo")
+	assert.Contains(t, msg, "50.0000")
+	assert.Contains(t, msg, "a1")
+	assert.Contains(t, msg, "a2")
+}
+
+func TestFormatter_FormatAlertTriggered(t *testing.T) {
+	t.Parallel()
+
+	alert := storage.Alert{
+		ID:        "x1",
+		Base:      "USD",
+		Direction: storage.DirectionAbove,
+		Threshold: 55,
+	}
+
+	msg := FormatAlertTriggered(alert, 56.5)
+
+	assert.Contains(t, msg, "Alerta")
+	assert.Contains(t, msg, "USD/VES")
+	assert.Contains(t, msg, "superó")
+	assert.Contains(t, msg, "55.0000")
+	assert.Contains(t, msg, "56.5000")
+}
+
+func TestFormatter_FormatAlertTriggered_Below(t *testing.T) {
+	t.Parallel()
+
+	alert := storage.Alert{
+		ID:        "x2",
+		Base:      "EUR",
+		Direction: storage.DirectionBelow,
+		Threshold: 50,
+	}
+
+	msg := FormatAlertTriggered(alert, 49.5)
+
+	assert.Contains(t, msg, "bajó de")
+}
+
+func TestFormatter_FormatNoAlerts(t *testing.T) {
+	t.Parallel()
+
+	msg := FormatNoAlerts()
+	assert.Contains(t, msg, "No tienes alertas activas")
+	assert.Contains(t, msg, "/alerta")
+}
+
+func TestFormatter_FormatAlertDeleted(t *testing.T) {
+	t.Parallel()
+
+	msg := FormatAlertDeleted()
+	assert.Contains(t, msg, "Alerta eliminada")
+}
+
+func TestFormatter_FormatAlertLimitReached(t *testing.T) {
+	t.Parallel()
+
+	msg := FormatAlertLimitReached()
+	assert.Contains(t, msg, "5 alertas")
+	assert.Contains(t, msg, "/borraralerta")
 }

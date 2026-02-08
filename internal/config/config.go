@@ -17,6 +17,9 @@ const (
 
 	DefaultFXRatesURL = "https://api.ojoporciento.com"
 	DefaultFXTimeout  = 10 * time.Second
+
+	DefaultBroadcastInterval = 1 * time.Minute
+	DefaultAlertInterval     = 5 * time.Minute
 )
 
 var (
@@ -25,6 +28,9 @@ var (
 	errMissingWebhookSecretToken = errors.New("missing webhook secret token")
 	errMissingFXRatesBaseURL     = errors.New("missing fxrates base url")
 	errFXRatesTimeoutNonPositive = errors.New("fxrates timeout must be positive")
+
+	errBroadcastIntervalNonPositive = errors.New("broadcast interval must be positive")
+	errAlertIntervalNonPositive     = errors.New("alert interval must be positive")
 )
 
 // Config holds all application configuration
@@ -32,6 +38,14 @@ type Config struct {
 	ListenAddress string         `toml:"listen_address"`
 	Telegram      TelegramConfig `toml:"telegram"`
 	FXRates       FXRatesConfig  `toml:"fxrates"`
+	Database      DBConfig       `toml:"database"`
+}
+
+// DBConfig holds database and scheduler settings
+type DBConfig struct {
+	ConnStr           string        `toml:"conn_str"`
+	BroadcastInterval time.Duration `toml:"broadcast_interval"`
+	AlertInterval     time.Duration `toml:"alert_interval"`
 }
 
 // TelegramConfig holds Telegram bot settings
@@ -54,6 +68,10 @@ func DefaultConfig() *Config {
 		FXRates: FXRatesConfig{
 			BaseURL: DefaultFXRatesURL,
 			Timeout: DefaultFXTimeout,
+		},
+		Database: DBConfig{
+			BroadcastInterval: DefaultBroadcastInterval,
+			AlertInterval:     DefaultAlertInterval,
 		},
 	}
 }
@@ -87,6 +105,17 @@ func ValidateConfig(config *Config) error {
 
 	if config.FXRates.Timeout <= 0 {
 		return errFXRatesTimeoutNonPositive
+	}
+
+	// Database validation (only when configured)
+	if strings.TrimSpace(config.Database.ConnStr) != "" {
+		if config.Database.BroadcastInterval <= 0 {
+			return errBroadcastIntervalNonPositive
+		}
+
+		if config.Database.AlertInterval <= 0 {
+			return errAlertIntervalNonPositive
+		}
 	}
 
 	if strings.TrimSpace(config.Telegram.WebhookURL) == "" {

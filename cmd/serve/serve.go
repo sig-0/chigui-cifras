@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/peterbourgon/ff/v3/ffcli"
 	"golang.org/x/sync/errgroup"
@@ -22,6 +23,8 @@ import (
 	"github.com/sig-0/chigui-cifras/internal/bot"
 	"github.com/sig-0/chigui-cifras/internal/config"
 	"github.com/sig-0/chigui-cifras/internal/fxrates"
+	"github.com/sig-0/chigui-cifras/internal/storage"
+	storagesql "github.com/sig-0/chigui-cifras/internal/storage/sql"
 )
 
 // serveCfg wraps the serve configuration
@@ -101,6 +104,27 @@ func (c *serveCfg) exec(ctx context.Context, _ []string) error {
 	// Initialize fxrates client
 	fxClient := fxrates.NewClient(c.config.FXRates.BaseURL, c.config.FXRates.Timeout)
 
+	// Optional DB setup
+	var (
+		store storage.Store
+		pool  *pgxpool.Pool
+	)
+
+	if dsn := strings.TrimSpace(c.config.Database.ConnStr); dsn != "" {
+		var poolErr error
+
+		pool, poolErr = pgxpool.New(ctx, dsn)
+		if poolErr != nil {
+			return fmt.Errorf("unable to connect to database: %w", poolErr)
+		}
+
+		defer pool.Close()
+
+		store = storagesql.NewAdapter(pool)
+
+		logger.Info("database connected")
+	}
+
 	// Initialize the Telegram bot
 	tgBot, err := bot.New(
 		c.config.Telegram.Token,
@@ -108,10 +132,24 @@ func (c *serveCfg) exec(ctx context.Context, _ []string) error {
 		logger,
 		bot.Settings{
 			WebhookSecretToken: c.config.Telegram.WebhookSecretToken,
+			Store:              store,
 		},
 	)
 	if err != nil {
 		return fmt.Errorf("unable to create bot: %w", err)
+	}
+
+	// Build optional scheduler
+	var sched *bot.Scheduler
+	if store != nil {
+		sched = bot.NewScheduler(
+			store,
+			fxClient,
+			tgBot,
+			c.config.Database.BroadcastInterval,
+			c.config.Database.AlertInterval,
+			logger,
+		)
 	}
 
 	// Setup run ctx
@@ -125,15 +163,16 @@ func (c *serveCfg) exec(ctx context.Context, _ []string) error {
 	defer cancelFn()
 
 	if strings.TrimSpace(c.config.Telegram.WebhookURL) != "" {
-		return runWebhookMode(runCtx, tgBot, logger, c.config)
+		return runWebhookMode(runCtx, tgBot, sched, logger, c.config)
 	}
 
-	return runPollingMode(runCtx, tgBot, logger, c.config)
+	return runPollingMode(runCtx, tgBot, sched, logger, c.config)
 }
 
 func runWebhookMode(
 	ctx context.Context,
 	tgBot *bot.Bot,
+	scheduler *bot.Scheduler,
 	logger *slog.Logger,
 	cfg *config.Config,
 ) error {
@@ -217,12 +256,21 @@ func runWebhookMode(
 		return nil
 	})
 
+	if scheduler != nil {
+		group.Go(func() error {
+			logger.Info("starting scheduler")
+
+			return scheduler.Run(gCtx)
+		})
+	}
+
 	return group.Wait()
 }
 
 func runPollingMode(
 	ctx context.Context,
 	tgBot *bot.Bot,
+	scheduler *bot.Scheduler,
 	logger *slog.Logger,
 	cfg *config.Config,
 ) error {
@@ -276,6 +324,14 @@ func runPollingMode(
 		return nil
 	})
 
+	if scheduler != nil {
+		group.Go(func() error {
+			logger.Info("starting scheduler")
+
+			return scheduler.Run(gCtx)
+		})
+	}
+
 	return group.Wait()
 }
 
@@ -303,6 +359,28 @@ func applyEnv(cfg *config.Config) error {
 		}
 
 		cfg.FXRates.Timeout = timeout
+	}
+
+	if v, ok := os.LookupEnv(env.Prefix + "_" + env.DatabaseURLSuffix); ok {
+		cfg.Database.ConnStr = v
+	}
+
+	if v, ok := os.LookupEnv(env.Prefix + "_" + env.BroadcastIntervalSuffix); ok {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return fmt.Errorf("invalid %s_%s: %w", env.Prefix, env.BroadcastIntervalSuffix, err)
+		}
+
+		cfg.Database.BroadcastInterval = d
+	}
+
+	if v, ok := os.LookupEnv(env.Prefix + "_" + env.AlertIntervalSuffix); ok {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return fmt.Errorf("invalid %s_%s: %w", env.Prefix, env.AlertIntervalSuffix, err)
+		}
+
+		cfg.Database.AlertInterval = d
 	}
 
 	return nil

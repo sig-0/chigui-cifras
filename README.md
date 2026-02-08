@@ -18,6 +18,11 @@ la API de [**fxrates**](github.com/sig-0/fxrates).
 | `/usdt`         | Atajo USDT/VES (Compra/Venta)    |
 | `/monedas`      | Listar monedas disponibles       |
 | `/ayuda`        | Ayuda                            |
+| `/suscribir <horario\|diario>` | Suscribirse a resúmenes automáticos |
+| `/desuscribir`  | Desuscribirse de resúmenes       |
+| `/alerta <moneda> <arriba\|abajo> <valor>` | Crear alerta de precio (máx 5) |
+| `/alertas`      | Listar alertas activas           |
+| `/borraralerta <id>` | Eliminar una alerta por ID  |
 
 Modo inline:
 
@@ -36,6 +41,9 @@ Variables principales:
 - `CHIGUI_WEBHOOK_LISTEN_ADDR` (opcional, default `0.0.0.0:8080`, solo webhook)
 - `CHIGUI_FXRATES_URL` (opcional, default `https://api.ojoporciento.com`)
 - `CHIGUI_FXRATES_TIMEOUT` (opcional, default `10s`)
+- `CHIGUI_DATABASE_URL` (opcional, PostgreSQL; habilita suscripciones y alertas)
+- `CHIGUI_BROADCAST_INTERVAL` (opcional, default `1m`)
+- `CHIGUI_ALERT_INTERVAL` (opcional, default `5m`)
 
 Flags disponibles:
 
@@ -60,3 +68,12 @@ Al iniciar, el bot registra el webhook automáticamente usando `CHIGUI_WEBHOOK_U
 
 - El endpoint del webhook en el path de esa URL.
 - `GET /health` para health checks.
+
+### Migraciones
+
+Si usas la base de datos (suscripciones y alertas):
+
+```bash
+CHIGUI_DATABASE_URL="postgres://user:pass@host:5432/db" \
+./build/server sql migrate 001_init.sql
+```

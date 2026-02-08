@@ -10,6 +10,7 @@ import (
 	"github.com/go-telegram/bot/models"
 
 	"github.com/sig-0/chigui-cifras/internal/fxrates"
+	"github.com/sig-0/chigui-cifras/internal/storage"
 )
 
 // Bot wraps the Telegram bot with handler
@@ -21,6 +22,7 @@ type Bot struct {
 
 // Settings contains optional Telegram bot settings
 type Settings struct {
+	Store              storage.Store // nil when DB not configured
 	WebhookSecretToken string
 }
 
@@ -31,7 +33,7 @@ func New(
 	logger *slog.Logger,
 	settings Settings,
 ) (*Bot, error) {
-	handlers := NewHandlers(fxClient, logger)
+	handlers := NewHandlers(fxClient, logger, settings.Store)
 
 	opts := []bot.Option{
 		bot.WithDefaultHandler(func(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -71,6 +73,13 @@ func (b *Bot) registerHandlers() {
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/dolar", bot.MatchTypePrefix, b.handler.Dolar)
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/euro", bot.MatchTypePrefix, b.handler.Euro)
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/usdt", bot.MatchTypePrefix, b.handler.USDT)
+
+	// Subscription and alert commands
+	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/suscribir", bot.MatchTypePrefix, b.handler.Subscribe)
+	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/desuscribir", bot.MatchTypePrefix, b.handler.Unsubscribe)
+	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/alerta", bot.MatchTypePrefix, b.handler.CreateAlert)
+	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/alertas", bot.MatchTypePrefix, b.handler.ListAlerts)
+	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/borraralerta", bot.MatchTypePrefix, b.handler.DeleteAlert)
 }
 
 // StartWebhook begins webhook mode dispatching for updates
@@ -108,6 +117,22 @@ func (b *Bot) SendMessage(ctx context.Context, chatID int64, text string) error 
 	_, err := b.bot.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: chatID,
 		Text:   text,
+	})
+
+	return err
+}
+
+// SendHTMLMessage sends an HTML-formatted message with link preview disabled
+func (b *Bot) SendHTMLMessage(ctx context.Context, chatID int64, text string) error {
+	disablePreview := true
+
+	_, err := b.bot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:    chatID,
+		Text:      text,
+		ParseMode: models.ParseModeHTML,
+		LinkPreviewOptions: &models.LinkPreviewOptions{
+			IsDisabled: &disablePreview,
+		},
 	})
 
 	return err

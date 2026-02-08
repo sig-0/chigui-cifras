@@ -10,6 +10,7 @@ import (
 	"github.com/sig-0/fxrates/storage/types"
 
 	"github.com/sig-0/chigui-cifras/internal/fxrates"
+	"github.com/sig-0/chigui-cifras/internal/storage"
 )
 
 const mozaikBranding = "\n\n\U0001F7E0 por <b>Mozaik Pay</b> · <a href=\"https://mozaik.money\">mozaik.money</a>"
@@ -59,7 +60,7 @@ func formatTime(value time.Time) string {
 		t.Day(), spanishMonth(t.Month()), t.Year(), t.Hour(), t.Minute())
 }
 
-// rateTypeLabel returns a Spanish label for the given rate type.
+// rateTypeLabel returns a Spanish label for the given rate type
 func rateTypeLabel(rt fxrates.RateType) string {
 	switch rt {
 	case types.RateTypeBUY:
@@ -71,7 +72,7 @@ func rateTypeLabel(rt fxrates.RateType) string {
 	}
 }
 
-// FormatRate formats a single exchange rate as HTML.
+// FormatRate formats a single exchange rate as HTML
 func FormatRate(rate fxrates.ExchangeRate) string {
 	emoji := emojiForCurrency(rate.Base)
 	base := html.EscapeString(string(rate.Base))
@@ -88,7 +89,7 @@ func FormatRate(rate fxrates.ExchangeRate) string {
 	return sb.String()
 }
 
-// FormatRates formats multiple exchange rates as HTML.
+// FormatRates formats multiple exchange rates as HTML
 func FormatRates(rates []fxrates.ExchangeRate) string {
 	if len(rates) == 0 {
 		return "No se encontraron tasas"
@@ -112,7 +113,7 @@ func FormatRates(rates []fxrates.ExchangeRate) string {
 	return sb.String()
 }
 
-// FormatDashboard formats the dashboard view showing popular VES rates as HTML.
+// FormatDashboard formats the dashboard view showing popular VES rates as HTML
 func FormatDashboard(usd, eur *fxrates.ExchangeRate, usdtRates []fxrates.ExchangeRate) string {
 	var sb strings.Builder
 	sb.WriteString("\U0001F4CA <b>Tasas del día</b>\n\n")
@@ -162,7 +163,7 @@ func FormatDashboard(usd, eur *fxrates.ExchangeRate, usdtRates []fxrates.Exchang
 	return sb.String()
 }
 
-// FormatCurrencies formats the list of currencies as HTML.
+// FormatCurrencies formats the list of currencies as HTML
 func FormatCurrencies(currencyList []fxrates.Currency) string {
 	var sb strings.Builder
 	sb.WriteString("\U0001F4B1 <b>Monedas soportadas</b>\n\n")
@@ -174,7 +175,7 @@ func FormatCurrencies(currencyList []fxrates.Currency) string {
 	return strings.TrimSuffix(sb.String(), "\n")
 }
 
-// StartMessage returns the welcome message as HTML.
+// StartMessage returns the welcome message as HTML
 func StartMessage() string {
 	var sb strings.Builder
 	sb.WriteString("👋 <b>¡Hola!</b>\n\n")
@@ -198,7 +199,7 @@ func StartMessage() string {
 	return sb.String()
 }
 
-// HelpMessage returns the help message as HTML.
+// HelpMessage returns the help message as HTML
 func HelpMessage() string {
 	var sb strings.Builder
 	sb.WriteString("\U0001F4D6 <b>Comandos de ChiguiCifras</b>\n\n") //nolint:misspell // Spanish
@@ -226,4 +227,101 @@ func ErrorMessage(err error) string {
 // InvalidUsageMessage returns an invalid usage message as HTML
 func InvalidUsageMessage(usage string) string {
 	return fmt.Sprintf("❌ Uso inválido.\n\nUso: %s", usage)
+}
+
+// FormatSubscribed formats a subscription confirmation message
+func FormatSubscribed(frequency string) string {
+	label := "diario"
+	if frequency == storage.FrequencyHourly {
+		label = "horario"
+	}
+
+	return fmt.Sprintf(
+		"✅ <b>Suscrito</b> al resumen <b>%s</b> de tasas.\n\nRecibirás las tasas del día automáticamente.",
+		label,
+	)
+}
+
+// FormatUnsubscribed formats an unsubscription confirmation message
+func FormatUnsubscribed() string {
+	return "✅ Te has <b>desuscrito</b> del resumen de tasas."
+}
+
+// FormatAlertCreated formats a confirmation for a newly created alert
+func FormatAlertCreated(alert storage.Alert) string {
+	dir := "por encima de"
+	if alert.Direction == storage.DirectionBelow {
+		dir = "por debajo de"
+	}
+
+	return fmt.Sprintf("🔔 <b>Alerta creada</b>\n\n%s %s/VES %s <code>%.4f</code>\n\nID: <code>%s</code>",
+		emojiForCurrency(fxrates.Currency(alert.Base)),
+		html.EscapeString(alert.Base),
+		dir,
+		alert.Threshold,
+		html.EscapeString(alert.ID),
+	)
+}
+
+// FormatAlerts formats a list of active alerts
+func FormatAlerts(alerts []*storage.Alert) string {
+	var sb strings.Builder
+	sb.WriteString("🔔 <b>Tus alertas activas</b>\n\n")
+
+	for _, a := range alerts {
+		dir := "↗ arriba"
+		if a.Direction == storage.DirectionBelow {
+			dir = "↘ abajo"
+		}
+
+		sb.WriteString(fmt.Sprintf("• %s %s/VES %s de <code>%.4f</code>\n  ID: <code>%s</code>\n",
+			emojiForCurrency(fxrates.Currency(a.Base)),
+			html.EscapeString(a.Base),
+			dir,
+			a.Threshold,
+			html.EscapeString(a.ID),
+		))
+	}
+
+	return strings.TrimSuffix(sb.String(), "\n")
+}
+
+// FormatAlertTriggered formats a notification for a triggered alert
+func FormatAlertTriggered(alert storage.Alert, currentRate float64) string {
+	dir := "superó"
+	if alert.Direction == storage.DirectionBelow {
+		dir = "bajó de"
+	}
+
+	return fmt.Sprintf("🚨 <b>¡Alerta!</b>\n\n%s %s/VES %s <code>%.4f</code>\n\nTasa actual: <code>%.4f</code> Bs",
+		emojiForCurrency(fxrates.Currency(alert.Base)),
+		html.EscapeString(alert.Base),
+		dir,
+		alert.Threshold,
+		currentRate,
+	)
+}
+
+// FormatNoAlerts returns a message when a user has no active alerts
+func FormatNoAlerts() string {
+	return "No tienes alertas activas.\n\nUsa /alerta &lt;moneda&gt; &lt;arriba|abajo&gt; &lt;valor&gt; para crear una."
+}
+
+// FormatAlertDeleted returns a confirmation for a deleted alert
+func FormatAlertDeleted() string {
+	return "✅ Alerta eliminada."
+}
+
+// FormatAlertLimitReached returns a message when the user has hit the alert limit
+func FormatAlertLimitReached() string {
+	return fmt.Sprintf(
+		"❌ Has alcanzado el límite de <b>%d alertas</b> activas."+
+			"\n\nElimina una con /borraralerta &lt;id&gt; antes de crear otra.",
+		storage.MaxAlertsPerChat,
+	)
+}
+
+// FormatServiceUnavailable returns a message when subscriptions/alerts are not configured
+func FormatServiceUnavailable() string {
+	return "❌ Este servicio no está disponible en este momento." //nolint:misspell // Spanish
 }

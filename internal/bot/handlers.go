@@ -2,30 +2,37 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"github.com/rs/xid"
 	"github.com/sig-0/fxrates/provider/currencies"
 	"github.com/sig-0/fxrates/provider/ves"
 	"github.com/sig-0/fxrates/storage/types"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/sig-0/chigui-cifras/internal/fxrates"
+	"github.com/sig-0/chigui-cifras/internal/storage"
 )
 
 // FxHandler holds command handler and their dependencies
 type FxHandler struct {
 	fxClient *fxrates.Client
+	store    storage.Store // nil when DB not configured
 	logger   *slog.Logger
 }
 
 // NewHandlers creates a new FxHandler instance
-func NewHandlers(fxClient *fxrates.Client, logger *slog.Logger) *FxHandler {
+func NewHandlers(fxClient *fxrates.Client, logger *slog.Logger, store storage.Store) *FxHandler {
 	return &FxHandler{
 		fxClient: fxClient,
+		store:    store,
 		logger:   logger,
 	}
 }
@@ -40,7 +47,7 @@ func (h *FxHandler) Help(ctx context.Context, b *bot.Bot, update *models.Update)
 	h.reply(ctx, b, update, HelpMessage())
 }
 
-// Rate handles the /tasa command.
+// Rate handles the /tasa command
 // With no args, it shows the dashboard; with one arg, shows pair vs VES; two args, shows explicit pair
 func (h *FxHandler) Rate(ctx context.Context, b *bot.Bot, update *models.Update) {
 	args := h.parseArgs(update.Message.Text)
@@ -58,7 +65,7 @@ func (h *FxHandler) Rate(ctx context.Context, b *bot.Bot, update *models.Update)
 		target = strings.ToUpper(args[1])
 	}
 
-	source := sourceForCurrency(fxrates.Currency(base))
+	source := SourceForCurrency(fxrates.Currency(base))
 
 	rates, err := h.fxClient.Rate(ctx, base, target, source.String())
 	if err != nil {
@@ -99,7 +106,7 @@ func (h *FxHandler) dashboard(ctx context.Context, b *bot.Bot, update *models.Up
 			return err
 		}
 
-		usdRate = selectPreferredRate(rates.Results)
+		usdRate = SelectPreferredRate(rates.Results)
 
 		return nil
 	})
@@ -110,7 +117,7 @@ func (h *FxHandler) dashboard(ctx context.Context, b *bot.Bot, update *models.Up
 			return err
 		}
 
-		eurRate = selectPreferredRate(rates.Results)
+		eurRate = SelectPreferredRate(rates.Results)
 
 		return nil
 	})
@@ -196,7 +203,7 @@ func (h *FxHandler) InlineQuery(ctx context.Context, b *bot.Bot, update *models.
 		return
 	}
 
-	source := sourceForCurrency(fxrates.Currency(base))
+	source := SourceForCurrency(fxrates.Currency(base))
 
 	rates, err := h.fxClient.Rate(ctx, base, target, source.String())
 	if err != nil {
@@ -205,7 +212,7 @@ func (h *FxHandler) InlineQuery(ctx context.Context, b *bot.Bot, update *models.
 		return
 	}
 
-	rate := selectPreferredRate(rates.Results)
+	rate := SelectPreferredRate(rates.Results)
 	if rate == nil {
 		h.answerInlineEmpty(ctx, b, inlineQuery, base, target)
 
@@ -231,7 +238,7 @@ func (h *FxHandler) InlineQuery(ctx context.Context, b *bot.Bot, update *models.
 
 func (h *FxHandler) rateShortcut(ctx context.Context, b *bot.Bot, update *models.Update, base string) {
 	target := currencies.VES.String()
-	source := sourceForCurrency(fxrates.Currency(base))
+	source := SourceForCurrency(fxrates.Currency(base))
 
 	rates, err := h.fxClient.Rate(ctx, base, target, source.String())
 	if err != nil {
@@ -240,7 +247,7 @@ func (h *FxHandler) rateShortcut(ctx context.Context, b *bot.Bot, update *models
 		return
 	}
 
-	rate := selectPreferredRate(rates.Results)
+	rate := SelectPreferredRate(rates.Results)
 	if rate == nil {
 		h.reply(ctx, b, update, "No se encontraron tasas para "+base+"/"+target)
 
@@ -373,9 +380,9 @@ func inlineResultID(title string) string {
 	return strings.ReplaceAll(strings.ToLower(title), "/", "-")
 }
 
-// sourceForCurrency returns the preferred source for a given base currency.
+// SourceForCurrency returns the preferred source for a given base currency
 // For fiat currencies, we use BCV
-func sourceForCurrency(base fxrates.Currency) fxrates.Source {
+func SourceForCurrency(base fxrates.Currency) fxrates.Source {
 	switch base {
 	case currencies.USD, currencies.EUR, currencies.RUB, currencies.TRY, currencies.CNY:
 		return ves.BCVSource
@@ -384,10 +391,10 @@ func sourceForCurrency(base fxrates.Currency) fxrates.Source {
 	}
 }
 
-// selectPreferredRate selects the best rate from the results based on the currency pair.
-// For fiat currencies (USD, EUR, etc.), it prefers MID rate from BCV.
+// SelectPreferredRate selects the best rate from the results based on the currency pair
+// For fiat currencies (USD, EUR, etc.), it prefers MID rate from BCV
 // For crypto (USDT), it prefers whatever is available (typically P2P)
-func selectPreferredRate(rates []fxrates.ExchangeRate) *fxrates.ExchangeRate {
+func SelectPreferredRate(rates []fxrates.ExchangeRate) *fxrates.ExchangeRate {
 	if len(rates) == 0 {
 		return nil
 	}
@@ -444,4 +451,172 @@ func parseInlineQuery(query string) (string, string, bool) {
 	}
 
 	return base, target, true
+}
+
+// requireStore checks if the store is available and replies with an error if not
+func (h *FxHandler) requireStore(ctx context.Context, b *bot.Bot, update *models.Update) bool {
+	if h.store != nil {
+		return true
+	}
+
+	h.reply(ctx, b, update, FormatServiceUnavailable())
+
+	return false
+}
+
+// Subscribe handles the /suscribir command
+func (h *FxHandler) Subscribe(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if !h.requireStore(ctx, b, update) {
+		return
+	}
+
+	args := h.parseArgs(update.Message.Text)
+	if len(args) < 1 {
+		h.reply(ctx, b, update, InvalidUsageMessage("/suscribir &lt;horario|diario&gt;"))
+
+		return
+	}
+
+	var frequency string
+
+	switch strings.ToLower(args[0]) {
+	case "horario":
+		frequency = storage.FrequencyHourly
+	case "diario":
+		frequency = storage.FrequencyDaily
+	default:
+		h.reply(ctx, b, update, InvalidUsageMessage("/suscribir &lt;horario|diario&gt;"))
+
+		return
+	}
+
+	nextSendAt := time.Now().Add(intervalForFrequency(frequency))
+
+	if err := h.store.Subscribe(ctx, update.Message.Chat.ID, frequency, nextSendAt); err != nil {
+		h.logger.Error("failed to subscribe", "chat_id", update.Message.Chat.ID, "error", err)
+		h.reply(ctx, b, update, ErrorMessage(err))
+
+		return
+	}
+
+	h.reply(ctx, b, update, FormatSubscribed(frequency))
+}
+
+// Unsubscribe handles the /desuscribir command
+func (h *FxHandler) Unsubscribe(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if !h.requireStore(ctx, b, update) {
+		return
+	}
+
+	if err := h.store.Unsubscribe(ctx, update.Message.Chat.ID); err != nil {
+		h.logger.Error("failed to unsubscribe", "chat_id", update.Message.Chat.ID, "error", err)
+		h.reply(ctx, b, update, ErrorMessage(err))
+
+		return
+	}
+
+	h.reply(ctx, b, update, FormatUnsubscribed())
+}
+
+// CreateAlert handles the /alerta command
+func (h *FxHandler) CreateAlert(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if !h.requireStore(ctx, b, update) {
+		return
+	}
+
+	args := h.parseArgs(update.Message.Text)
+	if len(args) < 3 {
+		h.reply(ctx, b, update, InvalidUsageMessage("/alerta &lt;moneda&gt; &lt;arriba|abajo&gt; &lt;valor&gt;"))
+
+		return
+	}
+
+	base := strings.ToUpper(args[0])
+
+	var direction string
+
+	switch strings.ToLower(args[1]) {
+	case "arriba":
+		direction = storage.DirectionAbove
+	case "abajo":
+		direction = storage.DirectionBelow
+	default:
+		h.reply(ctx, b, update, InvalidUsageMessage("/alerta &lt;moneda&gt; &lt;arriba|abajo&gt; &lt;valor&gt;"))
+
+		return
+	}
+
+	threshold, err := strconv.ParseFloat(args[2], 64)
+	if err != nil || threshold <= 0 {
+		h.reply(ctx, b, update, "❌ El valor debe ser un número positivo.")
+
+		return
+	}
+
+	chatID := update.Message.Chat.ID
+
+	alert, err := h.store.CreateAlert(ctx, xid.New().String(), chatID, base, direction, threshold)
+	if err != nil {
+		if errors.Is(err, storage.ErrAlertLimitReached) {
+			h.reply(ctx, b, update, FormatAlertLimitReached())
+
+			return
+		}
+
+		h.logger.Error("failed to create alert", "chat_id", chatID, "error", err)
+		h.reply(ctx, b, update, ErrorMessage(err))
+
+		return
+	}
+
+	h.reply(ctx, b, update, FormatAlertCreated(*alert))
+}
+
+// ListAlerts handles the /alertas command
+func (h *FxHandler) ListAlerts(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if !h.requireStore(ctx, b, update) {
+		return
+	}
+
+	alerts, err := h.store.AlertsByChat(ctx, update.Message.Chat.ID)
+	if err != nil {
+		h.logger.Error("failed to list alerts", "chat_id", update.Message.Chat.ID, "error", err)
+		h.reply(ctx, b, update, ErrorMessage(err))
+
+		return
+	}
+
+	if len(alerts) == 0 {
+		h.reply(ctx, b, update, FormatNoAlerts())
+
+		return
+	}
+
+	h.reply(ctx, b, update, FormatAlerts(alerts))
+}
+
+// DeleteAlert handles the /borraralerta command
+func (h *FxHandler) DeleteAlert(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if !h.requireStore(ctx, b, update) {
+		return
+	}
+
+	args := h.parseArgs(update.Message.Text)
+	if len(args) < 1 {
+		h.reply(ctx, b, update, InvalidUsageMessage("/borraralerta &lt;id&gt;"))
+
+		return
+	}
+
+	alertID := args[0]
+	chatID := update.Message.Chat.ID
+
+	if err := h.store.DeleteAlert(ctx, alertID, chatID); err != nil {
+		h.logger.Error("failed to delete alert", "chat_id", chatID, "alert_id", alertID, "error", err)
+		h.reply(ctx, b, update, ErrorMessage(err))
+
+		return
+	}
+
+	h.reply(ctx, b, update, FormatAlertDeleted())
 }

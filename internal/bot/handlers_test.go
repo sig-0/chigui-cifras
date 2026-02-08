@@ -10,7 +10,7 @@ import (
 func TestHandler_ParseArgs(t *testing.T) {
 	t.Parallel()
 
-	h := NewHandlers(nil, slog.Default())
+	h := NewHandlers(nil, slog.Default(), nil)
 
 	assert.Nil(t, h.parseArgs("/tasa"))
 	assert.Equal(t, []string{"USD", "VES"}, h.parseArgs("/tasa USD VES"))

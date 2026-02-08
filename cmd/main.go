@@ -10,6 +10,7 @@ import (
 
 	"github.com/sig-0/chigui-cifras/cmd/generate"
 	"github.com/sig-0/chigui-cifras/cmd/serve"
+	chiguisql "github.com/sig-0/chigui-cifras/cmd/sql"
 )
 
 func main() {
@@ -27,6 +28,7 @@ func main() {
 	cmd.Subcommands = []*ffcli.Command{
 		serve.NewServeCmd(),
 		generate.NewGenerateCmd(),
+		chiguisql.NewSQLCmd(),
 	}
 
 	if err := cmd.ParseAndRun(context.Background(), os.Args[1:]); err != nil {

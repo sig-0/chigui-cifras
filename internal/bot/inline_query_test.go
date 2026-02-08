@@ -56,7 +56,7 @@ func TestInlineQuery_ValidRate(t *testing.T) {
 	t.Cleanup(tgServer.Close)
 
 	client := fxrates.NewClient(fxServer.URL, time.Second)
-	h := NewHandlers(client, slog.Default())
+	h := NewHandlers(client, slog.Default(), nil)
 	b := newTelegramBot(t, tgServer.URL)
 
 	update := &models.Update{
@@ -98,7 +98,7 @@ func TestInlineQuery_Help(t *testing.T) {
 	tgServer, requests := newInlineServer(t)
 	t.Cleanup(tgServer.Close)
 
-	h := NewHandlers(nil, slog.Default())
+	h := NewHandlers(nil, slog.Default(), nil)
 	b := newTelegramBot(t, tgServer.URL)
 
 	update := &models.Update{
@@ -136,7 +136,7 @@ func TestInlineQuery_NoResults(t *testing.T) {
 	t.Cleanup(tgServer.Close)
 
 	client := fxrates.NewClient(fxServer.URL, time.Second)
-	h := NewHandlers(client, slog.Default())
+	h := NewHandlers(client, slog.Default(), nil)
 	b := newTelegramBot(t, tgServer.URL)
 
 	update := &models.Update{
@@ -170,7 +170,7 @@ func TestInlineQuery_Error(t *testing.T) {
 	t.Cleanup(tgServer.Close)
 
 	client := fxrates.NewClient(fxServer.URL, time.Second)
-	h := NewHandlers(client, slog.Default())
+	h := NewHandlers(client, slog.Default(), nil)
 	b := newTelegramBot(t, tgServer.URL)
 
 	update := &models.Update{

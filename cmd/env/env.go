@@ -8,4 +8,8 @@ const (
 	WebhookSecretTokenSuffix = "WEBHOOK_SECRET_TOKEN"
 	FXRatesURLSuffix         = "FXRATES_URL"
 	FXRatesTimeoutSuffix     = "FXRATES_TIMEOUT"
+
+	DatabaseURLSuffix       = "DATABASE_URL"
+	BroadcastIntervalSuffix = "BROADCAST_INTERVAL"
+	AlertIntervalSuffix     = "ALERT_INTERVAL"
 )

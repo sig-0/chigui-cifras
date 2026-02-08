@@ -16,6 +16,7 @@ func TestConfig_ValidateConfig(t *testing.T) {
 	const (
 		testWebhookURL  = "https://example.com/webhook"
 		testSecretToken = "secret"
+		testDatabaseURL = "postgres://localhost/db"
 	)
 
 	validConfig := func() *Config {
@@ -113,6 +114,36 @@ func TestConfig_ValidateConfig(t *testing.T) {
 			err: errFXRatesTimeoutNonPositive,
 		},
 		{
+			name: "broadcast interval non positive",
+			mutate: func(cfg *Config) {
+				cfg.Database.ConnStr = testDatabaseURL
+				cfg.Database.BroadcastInterval = 0
+			},
+			err: errBroadcastIntervalNonPositive,
+		},
+		{
+			name: "alert interval non positive",
+			mutate: func(cfg *Config) {
+				cfg.Database.ConnStr = testDatabaseURL
+				cfg.Database.AlertInterval = -1
+			},
+			err: errAlertIntervalNonPositive,
+		},
+		{
+			name: "valid database configuration",
+			mutate: func(cfg *Config) {
+				cfg.Database.ConnStr = testDatabaseURL
+			},
+		},
+		{
+			name: "no database skips interval validation",
+			mutate: func(cfg *Config) {
+				cfg.Database.ConnStr = ""
+				cfg.Database.BroadcastInterval = 0
+				cfg.Database.AlertInterval = 0
+			},
+		},
+		{
 			name: "valid configuration",
 		},
 	}
@@ -170,4 +201,39 @@ timeout = "12s"
 
 	assert.Equal(t, "http://example.com", cfg.FXRates.BaseURL)
 	assert.Equal(t, 12*time.Second, cfg.FXRates.Timeout)
+
+	// Database defaults preserved when not in TOML
+	assert.Empty(t, cfg.Database.ConnStr)
+	assert.Equal(t, DefaultBroadcastInterval, cfg.Database.BroadcastInterval)
+	assert.Equal(t, DefaultAlertInterval, cfg.Database.AlertInterval)
+}
+
+func TestConfig_Read_WithDatabase(t *testing.T) {
+	t.Parallel()
+
+	configBody := `
+[telegram]
+token = "token"
+
+[fxrates]
+base_url = "http://example.com"
+timeout = "12s"
+
+[database]
+conn_str = "postgres://localhost/mydb"
+broadcast_interval = "2h"
+alert_interval = "10m"
+`
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+
+	require.NoError(t, os.WriteFile(path, []byte(configBody), 0o600))
+
+	cfg, err := Read(path)
+
+	require.NoError(t, err)
+
+	assert.Equal(t, "postgres://localhost/mydb", cfg.Database.ConnStr)
+	assert.Equal(t, 2*time.Hour, cfg.Database.BroadcastInterval)
+	assert.Equal(t, 10*time.Minute, cfg.Database.AlertInterval)
 }
