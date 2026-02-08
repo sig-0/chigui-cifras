@@ -32,7 +32,7 @@ func NewHandlers(fxClient *fxrates.Client, logger *slog.Logger) *FxHandler {
 
 // Start handles the /start command
 func (h *FxHandler) Start(ctx context.Context, b *bot.Bot, update *models.Update) {
-	h.reply(ctx, b, update, StartMessage())
+	h.replyWithPreview(ctx, b, update, StartMessage())
 }
 
 // Help handles the /ayuda command
@@ -260,15 +260,34 @@ func (h *FxHandler) parseArgs(text string) []string {
 }
 
 func (h *FxHandler) reply(ctx context.Context, b *bot.Bot, update *models.Update, text string) {
+	disablePreview := true
+
+	h.sendMessage(ctx, b, update, text, &models.LinkPreviewOptions{
+		IsDisabled: &disablePreview,
+	})
+}
+
+func (h *FxHandler) replyWithPreview(ctx context.Context, b *bot.Bot, update *models.Update, text string) {
+	h.sendMessage(ctx, b, update, text, nil)
+}
+
+func (h *FxHandler) sendMessage(
+	ctx context.Context,
+	b *bot.Bot,
+	update *models.Update,
+	text string,
+	linkPreview *models.LinkPreviewOptions,
+) {
 	h.logger.Debug("sending reply",
 		"chat_id", update.Message.Chat.ID,
 		"text_length", len(text),
 	)
 
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:    update.Message.Chat.ID,
-		Text:      text,
-		ParseMode: models.ParseModeHTML,
+		ChatID:             update.Message.Chat.ID,
+		Text:               text,
+		ParseMode:          models.ParseModeHTML,
+		LinkPreviewOptions: linkPreview,
 	})
 	if err != nil {
 		h.logger.Error("failed to send message",

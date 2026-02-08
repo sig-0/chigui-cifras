@@ -63,6 +63,8 @@ func TestFormatter_FormatRate(t *testing.T) {
 	assert.Contains(t, message, "BCV")
 	assert.Contains(t, message, "Tasa media")
 	assert.Contains(t, message, "02 ene 2026, 11:04 VET")
+	assert.Contains(t, message, "Mozaik Pay")
+	assert.Contains(t, message, `href="https://mozaik.money"`)
 }
 
 func TestFormatter_FormatRates(t *testing.T) {
@@ -111,6 +113,7 @@ func TestFormatter_FormatRates(t *testing.T) {
 		assert.Contains(t, message, "BCV")
 		assert.Contains(t, message, "Tasa media")
 		assert.Contains(t, message, "02 ene 2026, 11:04 VET")
+		assert.Contains(t, message, "Mozaik Pay")
 	})
 }
 
@@ -154,6 +157,7 @@ func TestFormatter_FormatDashboard(t *testing.T) {
 	// Separate timestamps for BCV and P2P
 	assert.Contains(t, message, "BCV · 01 feb 2026, 08:00 VET")
 	assert.Contains(t, message, "P2P · 01 feb 2026, 10:30 VET")
+	assert.Contains(t, message, "Mozaik Pay")
 }
 
 func TestFormatter_FormatDashboard_Partial(t *testing.T) {
@@ -199,6 +203,10 @@ func TestFormatter_StartMessage(t *testing.T) {
 	assert.Contains(t, message, "Hola")
 	assert.Contains(t, message, "/dolar")
 	assert.Contains(t, message, "/ayuda")
+	assert.Contains(t, message, "Mozaik Pay")
+	assert.Contains(t, message, "mover tu dinero en LATAM")
+	assert.Contains(t, message, "utm_campaign=chiguicifras")
+	assert.Contains(t, message, "Únete al acceso anticipado")
 }
 
 func TestFormatter_HelpMessage(t *testing.T) {

@@ -12,6 +12,8 @@ import (
 	"github.com/sig-0/chigui-cifras/internal/fxrates"
 )
 
+const mozaikBranding = "\n\n\U0001F7E0 por <b>Mozaik Pay</b> · <a href=\"https://mozaik.money\">mozaik.money</a>"
+
 // currencyEmoji maps currency codes to emoji representations
 var currencyEmoji = map[fxrates.Currency]string{
 	currencies.USD:  "\U0001F4B5", // dollar
@@ -81,6 +83,7 @@ func FormatRate(rate fxrates.ExchangeRate) string {
 	sb.WriteString(fmt.Sprintf("<code>%.2f</code> Bs\n\n", rate.Rate))
 	sb.WriteString(fmt.Sprintf("\U0001F4CA %s · %s\n", source, rateTypeLabel(rate.RateType)))
 	sb.WriteString(fmt.Sprintf("\U0001F4C5 %s", formatTime(rate.AsOf)))
+	sb.WriteString(mozaikBranding)
 
 	return sb.String()
 }
@@ -104,6 +107,7 @@ func FormatRates(rates []fxrates.ExchangeRate) string {
 	}
 
 	sb.WriteString(fmt.Sprintf("\n\U0001F4C5 %s", formatTime(rates[0].AsOf)))
+	sb.WriteString(mozaikBranding)
 
 	return sb.String()
 }
@@ -153,6 +157,8 @@ func FormatDashboard(usd, eur *fxrates.ExchangeRate, usdtRates []fxrates.Exchang
 			html.EscapeString(string(usdtRates[0].Source)), formatTime(usdtRates[0].AsOf)))
 	}
 
+	sb.WriteString(mozaikBranding)
+
 	return sb.String()
 }
 
@@ -183,6 +189,11 @@ func StartMessage() string {
 	sb.WriteString("• /tasa USD - Tasa de una moneda\n")
 	sb.WriteString("• /monedas - Listar monedas disponibles\n")
 	sb.WriteString("\nEscribe /ayuda para ver todos los comandos.") //nolint:misspell // Spanish
+	sb.WriteString("\n\n\U0001F7E0 <b>Mozaik Pay</b>")
+	sb.WriteString(" — Pasa de ver la tasa a mover tu dinero en LATAM.\n")
+	sb.WriteString("\U0001F449 <a href=\"https://mozaik.money/")
+	sb.WriteString("?utm_source=telegram&amp;utm_medium=bot&amp;utm_campaign=chiguicifras\">")
+	sb.WriteString("Únete al acceso anticipado</a>")
 
 	return sb.String()
 }
