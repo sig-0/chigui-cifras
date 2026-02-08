@@ -326,7 +326,7 @@ func TestCheckAlerts_TriggersAbove(t *testing.T) {
 	require.Len(t, sent, 1)
 	assert.Equal(t, int64(42), sent[0].ChatID)
 	assert.Contains(t, sent[0].Text, "¡Alerta!")
-	assert.Contains(t, sent[0].Text, "52.4300")
+	assert.Contains(t, sent[0].Text, "52.43")
 
 	assert.Equal(t, []string{"a1"}, triggeredIDs)
 }

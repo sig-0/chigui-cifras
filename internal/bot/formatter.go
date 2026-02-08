@@ -264,7 +264,7 @@ func FormatAlertCreated(alert storage.Alert) string {
 		dir = "por debajo de"
 	}
 
-	return fmt.Sprintf("🔔 <b>Alerta creada</b>\n\n%s %s/VES %s <code>%.4f</code>\n\nID: <code>%s</code>",
+	return fmt.Sprintf("🔔 <b>Alerta creada</b>\n\n%s %s/VES %s <code>%.2f</code>\n\nID: <code>%s</code>",
 		emojiForCurrency(fxrates.Currency(alert.Base)),
 		html.EscapeString(alert.Base),
 		dir,
@@ -284,7 +284,7 @@ func FormatAlerts(alerts []*storage.Alert) string {
 			dir = "↘ abajo"
 		}
 
-		sb.WriteString(fmt.Sprintf("• %s %s/VES %s de <code>%.4f</code>\n  ID: <code>%s</code>\n",
+		sb.WriteString(fmt.Sprintf("• %s %s/VES %s de <code>%.2f</code>\n  ID: <code>%s</code>\n",
 			emojiForCurrency(fxrates.Currency(a.Base)),
 			html.EscapeString(a.Base),
 			dir,
@@ -303,7 +303,7 @@ func FormatAlertTriggered(alert storage.Alert, currentRate float64) string {
 		dir = "bajó de"
 	}
 
-	return fmt.Sprintf("🚨 <b>¡Alerta!</b>\n\n%s %s/VES %s <code>%.4f</code>\n\nTasa actual: <code>%.4f</code> Bs",
+	return fmt.Sprintf("🚨 <b>¡Alerta!</b>\n\n%s %s/VES %s <code>%.2f</code>\n\nTasa actual: <code>%.2f</code> Bs",
 		emojiForCurrency(fxrates.Currency(alert.Base)),
 		html.EscapeString(alert.Base),
 		dir,

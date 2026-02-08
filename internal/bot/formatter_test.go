@@ -292,7 +292,7 @@ func TestFormatter_FormatAlertCreated(t *testing.T) {
 	assert.Contains(t, msg, "Alerta creada")
 	assert.Contains(t, msg, "USD/VES")
 	assert.Contains(t, msg, "por encima de")
-	assert.Contains(t, msg, "55.5000")
+	assert.Contains(t, msg, "55.50")
 	assert.Contains(t, msg, "test123")
 }
 
@@ -325,10 +325,10 @@ func TestFormatter_FormatAlerts(t *testing.T) {
 	assert.Contains(t, msg, "alertas activas")
 	assert.Contains(t, msg, "USD/VES")
 	assert.Contains(t, msg, "arriba")
-	assert.Contains(t, msg, "55.0000")
+	assert.Contains(t, msg, "55.00")
 	assert.Contains(t, msg, "EUR/VES")
 	assert.Contains(t, msg, "abajo")
-	assert.Contains(t, msg, "50.0000")
+	assert.Contains(t, msg, "50.00")
 	assert.Contains(t, msg, "a1")
 	assert.Contains(t, msg, "a2")
 }
@@ -348,8 +348,8 @@ func TestFormatter_FormatAlertTriggered(t *testing.T) {
 	assert.Contains(t, msg, "Alerta")
 	assert.Contains(t, msg, "USD/VES")
 	assert.Contains(t, msg, "superó")
-	assert.Contains(t, msg, "55.0000")
-	assert.Contains(t, msg, "56.5000")
+	assert.Contains(t, msg, "55.00")
+	assert.Contains(t, msg, "56.50")
 }
 
 func TestFormatter_FormatAlertTriggered_Below(t *testing.T) {
