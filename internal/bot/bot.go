@@ -77,8 +77,8 @@ func (b *Bot) registerHandlers() {
 	// Subscription and alert commands
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/suscribir", bot.MatchTypePrefix, b.handler.Subscribe)
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/desuscribir", bot.MatchTypePrefix, b.handler.Unsubscribe)
-	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/alerta", bot.MatchTypePrefix, b.handler.CreateAlert)
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/alertas", bot.MatchTypePrefix, b.handler.ListAlerts)
+	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/alerta", bot.MatchTypePrefix, b.handler.CreateAlert)
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/borraralerta", bot.MatchTypePrefix, b.handler.DeleteAlert)
 }
 
