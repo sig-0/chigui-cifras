@@ -7,27 +7,21 @@ la API de [**fxrates**](github.com/sig-0/fxrates).
 
 ## Comandos
 
-Comandos principales (ES):
-
-- `/inicio` o `/ayuda`
-- `/tasa <base> [destino]`
-- `/tasas <base>`
-- `/monedas`
-
-Comandos principales (EN):
-
-- `/start` o `/help`
-- `/rate <base> [target]`
-- `/rates <base>`
-- `/currencies`
-
-Atajos VES:
-
-- `/dolar`, `/euro`, `/usdt`, `/rublo`, `/lira`, `/yuan`
+| Comando         | Descripción                      |
+|-----------------|----------------------------------|
+| `/start`        | Mensaje de bienvenida            |
+| `/tasa`         | Tasas del día (USD, EUR, USDT)   |
+| `/tasa USD`     | Tasa de un par específico vs VES |
+| `/tasa USD COP` | Par explícito                    |
+| `/dolar`        | Atajo USD/VES                    |
+| `/euro`         | Atajo EUR/VES                    |
+| `/usdt`         | Atajo USDT/VES (Compra/Venta)    |
+| `/monedas`      | Listar monedas disponibles       |
+| `/ayuda`        | Ayuda                            |
 
 Modo inline:
 
-- Usa `@TuBot USD VES` o `@TuBot USD` (destino VES por defecto)
+- Usa `@ChiguiCifrasBot USD VES` o `@ChiguiCifrasBot USD` (destino VES por defecto)
 
 ## Configuración
 
