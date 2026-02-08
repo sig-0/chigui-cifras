@@ -7,22 +7,22 @@ la API de [**fxrates**](github.com/sig-0/fxrates).
 
 ## Comandos
 
-| Comando         | Descripción                      |
-|-----------------|----------------------------------|
-| `/start`        | Mensaje de bienvenida            |
-| `/tasa`         | Tasas del día (USD, EUR, USDT)   |
-| `/tasa USD`     | Tasa de un par específico vs VES |
-| `/tasa USD COP` | Par explícito                    |
-| `/dolar`        | Atajo USD/VES                    |
-| `/euro`         | Atajo EUR/VES                    |
-| `/usdt`         | Atajo USDT/VES (Compra/Venta)    |
-| `/monedas`      | Listar monedas disponibles       |
-| `/ayuda`        | Ayuda                            |
-| `/suscribir <horario\|diario>` | Suscribirse a resúmenes automáticos |
-| `/desuscribir`  | Desuscribirse de resúmenes       |
-| `/alerta <moneda> <arriba\|abajo> <valor>` | Crear alerta de precio (máx 5) |
-| `/alertas`      | Listar alertas activas           |
-| `/borraralerta <id>` | Eliminar una alerta por ID  |
+| Comando                                    | Descripción                         |
+|--------------------------------------------|-------------------------------------|
+| `/start`                                   | Mensaje de bienvenida               |
+| `/tasa`                                    | Tasas del día (USD, EUR, USDT)      |
+| `/tasa USD`                                | Tasa de un par específico vs VES    |
+| `/tasa USD COP`                            | Par explícito                       |
+| `/dolar`                                   | Atajo USD/VES                       |
+| `/euro`                                    | Atajo EUR/VES                       |
+| `/usdt`                                    | Atajo USDT/VES (Compra/Venta)       |
+| `/monedas`                                 | Listar monedas disponibles          |
+| `/ayuda`                                   | Ayuda                               |
+| `/suscribir <horario\|diario>`             | Suscribirse a resúmenes automáticos |
+| `/desuscribir`                             | Desuscribirse de resúmenes          |
+| `/alerta <moneda> <arriba\|abajo> <valor>` | Crear alerta de precio (máx 5)      |
+| `/alertas`                                 | Listar alertas activas              |
+| `/borraralerta <id>`                       | Eliminar una alerta por ID          |
 
 Modo inline:
 
