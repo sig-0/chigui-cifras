@@ -19,7 +19,7 @@ import (
 	"github.com/sig-0/fxrates/storage/types"
 )
 
-func TestInlineQuery_ValidRateEnglish(t *testing.T) {
+func TestInlineQuery_ValidRate(t *testing.T) {
 	t.Parallel()
 
 	var (
@@ -63,9 +63,7 @@ func TestInlineQuery_ValidRateEnglish(t *testing.T) {
 		InlineQuery: &models.InlineQuery{
 			ID:    "inline-1",
 			Query: "USD",
-			From: &models.User{
-				LanguageCode: "en-US",
-			},
+			From:  &models.User{},
 		},
 	}
 
@@ -84,13 +82,17 @@ func TestInlineQuery_ValidRateEnglish(t *testing.T) {
 	assert.Contains(t, resultString(result, "description"), "42.1234")
 
 	message := resultMessageText(t, result)
-	assert.Contains(t, message, "Rate:")
-	assert.Contains(t, message, "USD")
-	assert.Contains(t, message, "VES")
-	assert.Contains(t, message, "VET")
+	assert.Contains(t, message, "<b>USD → VES</b>")
+	assert.Contains(t, message, "<code>42.12</code>")
+	assert.Contains(t, message, "BCV")
+
+	// Verify HTML parse mode
+	content, ok := result["input_message_content"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "HTML", content["parse_mode"])
 }
 
-func TestInlineQuery_HelpEnglish(t *testing.T) {
+func TestInlineQuery_Help(t *testing.T) {
 	t.Parallel()
 
 	tgServer, requests := newInlineServer(t)
@@ -103,9 +105,7 @@ func TestInlineQuery_HelpEnglish(t *testing.T) {
 		InlineQuery: &models.InlineQuery{
 			ID:    "inline-2",
 			Query: "",
-			From: &models.User{
-				LanguageCode: "en",
-			},
+			From:  &models.User{},
 		},
 	}
 
@@ -116,12 +116,12 @@ func TestInlineQuery_HelpEnglish(t *testing.T) {
 	require.Len(t, request.Results, 1)
 	result := request.Results[0]
 
-	assert.Equal(t, "Help", resultString(result, "title"))
+	assert.Equal(t, "Ayuda", resultString(result, "title"))
 	assert.Contains(t, resultString(result, "description"), "USD VES")
-	assert.Contains(t, resultMessageText(t, result), "Use: USD VES")
+	assert.Contains(t, resultMessageText(t, result), "Usa: USD VES")
 }
 
-func TestInlineQuery_NoResultsSpanish(t *testing.T) {
+func TestInlineQuery_NoResults(t *testing.T) {
 	t.Parallel()
 
 	response := fxrates.PageExchangeRate{}
@@ -143,9 +143,7 @@ func TestInlineQuery_NoResultsSpanish(t *testing.T) {
 		InlineQuery: &models.InlineQuery{
 			ID:    "inline-3",
 			Query: "USD VES",
-			From: &models.User{
-				LanguageCode: "es-VE",
-			},
+			From:  &models.User{},
 		},
 	}
 
@@ -160,7 +158,7 @@ func TestInlineQuery_NoResultsSpanish(t *testing.T) {
 	assert.Contains(t, resultMessageText(t, result), "No se encontraron tasas para USD/VES")
 }
 
-func TestInlineQuery_ErrorSpanish(t *testing.T) {
+func TestInlineQuery_Error(t *testing.T) {
 	t.Parallel()
 
 	fxServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -179,9 +177,7 @@ func TestInlineQuery_ErrorSpanish(t *testing.T) {
 		InlineQuery: &models.InlineQuery{
 			ID:    "inline-4",
 			Query: "USD VES",
-			From: &models.User{
-				LanguageCode: "es",
-			},
+			From:  &models.User{},
 		},
 	}
 
@@ -255,18 +251,6 @@ func TestInlineQuery_ParseInlineQuery(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestInlineQuery_LanguageForInline(t *testing.T) {
-	t.Parallel()
-
-	h := NewHandlers(nil, slog.Default())
-
-	assert.Equal(t, LanguageES, h.languageForInline(nil))
-	assert.Equal(t, LanguageES, h.languageForInline(&models.InlineQuery{}))
-	assert.Equal(t, LanguageEN, h.languageForInline(&models.InlineQuery{From: &models.User{LanguageCode: "en"}}))
-	assert.Equal(t, LanguageEN, h.languageForInline(&models.InlineQuery{From: &models.User{LanguageCode: "en-US"}}))
-	assert.Equal(t, LanguageES, h.languageForInline(&models.InlineQuery{From: &models.User{LanguageCode: "es-VE"}}))
 }
 
 type inlineRequest struct {

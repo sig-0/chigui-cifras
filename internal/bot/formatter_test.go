@@ -13,6 +13,35 @@ import (
 	"github.com/sig-0/chigui-cifras/internal/fxrates"
 )
 
+func TestFormatter_SpanishMonth(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "ene", spanishMonth(time.January))
+	assert.Equal(t, "feb", spanishMonth(time.February))
+	assert.Equal(t, "dic", spanishMonth(time.December))
+	assert.Equal(t, "", spanishMonth(0))
+	assert.Equal(t, "", spanishMonth(13))
+}
+
+func TestFormatter_RateTypeLabel(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "Tasa media", rateTypeLabel(types.RateTypeMID))
+	assert.Equal(t, "Compra", rateTypeLabel(types.RateTypeBUY))
+	assert.Equal(t, "Venta", rateTypeLabel(types.RateTypeSELL))
+	assert.Equal(t, "Tasa media", rateTypeLabel("OTHER"))
+}
+
+func TestFormatter_FormatTime(t *testing.T) {
+	t.Parallel()
+
+	// 2026-01-02 15:04 UTC → 2026-01-02 11:04 VET
+	ts := time.Date(2026, time.January, 2, 15, 4, 0, 0, time.UTC)
+	result := formatTime(ts)
+
+	assert.Equal(t, "02 ene 2026, 11:04", result)
+}
+
 func TestFormatter_FormatRate(t *testing.T) {
 	t.Parallel()
 
@@ -26,41 +55,14 @@ func TestFormatter_FormatRate(t *testing.T) {
 		FetchedAt: time.Date(2026, time.January, 2, 15, 5, 0, 0, time.UTC),
 	}
 
-	t.Run("english", func(t *testing.T) {
-		t.Parallel()
+	message := FormatRate(rate)
 
-		message := FormatRate(rate, LanguageEN)
-
-		assert.Contains(t, message, "USD")
-		assert.Contains(t, message, "VES")
-		assert.Contains(t, message, "Rate:")
-		assert.Contains(t, message, "42.00")
-		assert.Contains(t, message, "Source:")
-		assert.Contains(t, message, "BCV")
-		assert.Contains(t, message, "Type:")
-		assert.Contains(t, message, "MID")
-		assert.Contains(t, message, "Effective:")
-		assert.Contains(t, message, "2026-01-02 11:04 VET")
-		assert.NotContains(t, message, "Fetched:")
-	})
-
-	t.Run("spanish", func(t *testing.T) {
-		t.Parallel()
-
-		message := FormatRate(rate, LanguageES)
-
-		assert.Contains(t, message, "USD")
-		assert.Contains(t, message, "VES")
-		assert.Contains(t, message, "Tasa:")
-		assert.Contains(t, message, "42.00")
-		assert.Contains(t, message, "Fuente:")
-		assert.Contains(t, message, "BCV")
-		assert.Contains(t, message, "Tipo:")
-		assert.Contains(t, message, "MID")
-		assert.Contains(t, message, "Efectivo:")
-		assert.Contains(t, message, "2026-01-02 11:04 VET")
-		assert.NotContains(t, message, "Actualizado:")
-	})
+	assert.Contains(t, message, "<b>USD → VES</b>")
+	assert.Contains(t, message, "<code>42.00</code>")
+	assert.Contains(t, message, "Bs")
+	assert.Contains(t, message, "BCV")
+	assert.Contains(t, message, "Tasa media")
+	assert.Contains(t, message, "02 ene 2026, 11:04")
 }
 
 func TestFormatter_FormatRates(t *testing.T) {
@@ -90,95 +92,122 @@ func TestFormatter_FormatRates(t *testing.T) {
 		}
 	)
 
-	t.Run("empty english", func(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Equal(t, "No rates found", FormatRates(nil, LanguageEN))
+		assert.Equal(t, "No se encontraron tasas", FormatRates(nil))
 	})
 
-	t.Run("empty spanish", func(t *testing.T) {
+	t.Run("with rates", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Equal(t, "No se encontraron tasas", FormatRates(nil, LanguageES))
-	})
+		message := FormatRates(rates)
 
-	t.Run("english", func(t *testing.T) {
-		t.Parallel()
-
-		message := FormatRates(rates, LanguageEN)
-
-		assert.Contains(t, message, "Rates for USD")
+		assert.Contains(t, message, "<b>Tasas de USD</b>")
 		assert.Contains(t, message, "VES")
-		assert.Contains(t, message, "40.00")
+		assert.Contains(t, message, "<code>40.00</code>")
 		assert.Contains(t, message, "EUR")
-		assert.Contains(t, message, "0.90")
+		assert.Contains(t, message, "<code>0.90</code>")
 		assert.Contains(t, message, "BCV")
-		assert.Contains(t, message, "MID")
-		assert.Contains(t, message, "Effective:")
-		assert.Contains(t, message, "2026-01-02 11:04 VET")
+		assert.Contains(t, message, "Tasa media")
+		assert.Contains(t, message, "02 ene 2026, 11:04")
 	})
+}
 
-	t.Run("spanish", func(t *testing.T) {
-		t.Parallel()
+func TestFormatter_FormatDashboard(t *testing.T) {
+	t.Parallel()
 
-		message := FormatRates(rates, LanguageES)
+	rateTime := time.Date(2026, time.February, 1, 12, 0, 0, 0, time.UTC)
 
-		assert.Contains(t, message, "Tasas de USD")
-		assert.Contains(t, message, "VES")
-		assert.Contains(t, message, "40.00")
-		assert.Contains(t, message, "EUR")
-		assert.Contains(t, message, "0.90")
-		assert.Contains(t, message, "BCV")
-		assert.Contains(t, message, "MID")
-		assert.Contains(t, message, "Efectivo:")
-		assert.Contains(t, message, "2026-01-02 11:04 VET")
-	})
+	usd := &fxrates.ExchangeRate{
+		Base: types.CurrencyUSD, Target: types.CurrencyVES,
+		Rate: 52.43, RateType: types.RateTypeMID, Source: types.SourceBCV, AsOf: rateTime,
+	}
+	eur := &fxrates.ExchangeRate{
+		Base: types.CurrencyEUR, Target: types.CurrencyVES,
+		Rate: 56.12, RateType: types.RateTypeMID, Source: types.SourceBCV, AsOf: rateTime,
+	}
+	usdtRates := []fxrates.ExchangeRate{
+		{
+			Base: types.CurrencyUSDT, Target: types.CurrencyVES,
+			Rate: 51.80, RateType: types.RateTypeBUY, Source: "P2P", AsOf: rateTime,
+		},
+		{
+			Base: types.CurrencyUSDT, Target: types.CurrencyVES,
+			Rate: 52.10, RateType: types.RateTypeSELL, Source: "P2P", AsOf: rateTime,
+		},
+	}
+
+	message := FormatDashboard(usd, eur, usdtRates)
+
+	assert.Contains(t, message, "<b>Tasas del día</b>")
+	assert.Contains(t, message, "USD/VES")
+	assert.Contains(t, message, "<code>52.43</code>")
+	assert.Contains(t, message, "EUR/VES")
+	assert.Contains(t, message, "<code>56.12</code>")
+	assert.Contains(t, message, "USDT/VES")
+	assert.Contains(t, message, "Compra:")
+	assert.Contains(t, message, "<code>51.80</code>")
+	assert.Contains(t, message, "Venta:")
+	assert.Contains(t, message, "<code>52.10</code>")
+	assert.Contains(t, message, "BCV")
+	assert.Contains(t, message, "01 feb 2026, 08:00")
+}
+
+func TestFormatter_FormatDashboard_Partial(t *testing.T) {
+	t.Parallel()
+
+	rateTime := time.Date(2026, time.February, 1, 12, 0, 0, 0, time.UTC)
+
+	usd := &fxrates.ExchangeRate{
+		Base: types.CurrencyUSD, Target: types.CurrencyVES,
+		Rate: 52.43, RateType: types.RateTypeMID, Source: types.SourceBCV, AsOf: rateTime,
+	}
+
+	message := FormatDashboard(usd, nil, nil)
+
+	assert.Contains(t, message, "USD/VES")
+	assert.Contains(t, message, "<code>52.43</code>")
+	assert.NotContains(t, message, "EUR/VES")
+	assert.NotContains(t, message, "USDT/VES")
 }
 
 func TestFormatter_FormatCurrencies(t *testing.T) {
 	t.Parallel()
 
-	currencies := []fxrates.Currency{
+	currencyList := []fxrates.Currency{
 		types.CurrencyUSD,
 		types.CurrencyVES,
 		types.CurrencyEUR,
 	}
 
-	t.Run("english", func(t *testing.T) {
-		t.Parallel()
+	message := FormatCurrencies(currencyList)
 
-		message := FormatCurrencies(currencies, LanguageEN)
-
-		assert.Contains(t, message, "Supported currencies")
-		assert.Contains(t, message, "USD")
-		assert.Contains(t, message, "VES")
-		assert.Contains(t, message, "EUR")
-	})
-
-	t.Run("spanish", func(t *testing.T) {
-		t.Parallel()
-
-		message := FormatCurrencies(currencies, LanguageES)
-
-		assert.Contains(t, message, "Monedas soportadas")
-		assert.Contains(t, message, "USD")
-		assert.Contains(t, message, "VES")
-		assert.Contains(t, message, "EUR")
-	})
+	assert.Contains(t, message, "<b>Monedas soportadas</b>")
+	assert.Contains(t, message, "USD")
+	assert.Contains(t, message, "VES")
+	assert.Contains(t, message, "EUR")
 }
 
 func TestFormatter_StartMessage(t *testing.T) {
 	t.Parallel()
 
-	assert.Contains(t, StartMessage(LanguageEN), "Hello")
-	assert.Contains(t, StartMessage(LanguageES), "Hola")
+	message := StartMessage()
+
+	assert.Contains(t, message, "Hola")
+	assert.Contains(t, message, "/dolar")
+	assert.Contains(t, message, "/ayuda")
 }
 
 func TestFormatter_HelpMessage(t *testing.T) {
 	t.Parallel()
 
-	assert.Contains(t, HelpMessage(LanguageEN), "Commands")
-	assert.Contains(t, HelpMessage(LanguageES), "Comandos") //nolint:misspell // Spanish copy
+	message := HelpMessage()
+
+	assert.Contains(t, message, "Comandos") //nolint:misspell // Spanish copy
+	assert.Contains(t, message, "/tasa")
+	assert.Contains(t, message, "/dolar")
+	assert.Contains(t, message, "/monedas")
 }
 
 func TestFormatter_ErrorMessage(t *testing.T) {
@@ -186,21 +215,19 @@ func TestFormatter_ErrorMessage(t *testing.T) {
 
 	err := errors.New("boom")
 
-	assert.Contains(t, ErrorMessage(err, LanguageEN), "Error: boom")
-	assert.Contains(t, ErrorMessage(err, LanguageES), "Error: boom")
+	assert.Contains(t, ErrorMessage(err), "Error: boom")
 }
 
 func TestFormatter_InvalidUsageMessage(t *testing.T) {
 	t.Parallel()
 
-	assert.Contains(t, InvalidUsageMessage("/rate <base>", LanguageEN), "Usage: /rate <base>")
-	assert.Contains(t, InvalidUsageMessage("/tasa <base>", LanguageES), "Uso: /tasa <base>")
+	assert.Contains(t, InvalidUsageMessage("/tasa <base>"), "Uso: /tasa <base>")
 }
 
 func TestFormatter_GetEmoji(t *testing.T) {
 	t.Parallel()
 
-	emoji := getEmoji(types.CurrencyUSD)
+	emoji := emojiForCurrency(types.CurrencyUSD)
 
 	require.NotEmpty(t, emoji)
 }

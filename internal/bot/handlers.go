@@ -11,6 +11,7 @@ import (
 	"github.com/sig-0/fxrates/provider/currencies"
 	"github.com/sig-0/fxrates/provider/ves"
 	"github.com/sig-0/fxrates/storage/types"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/sig-0/chigui-cifras/internal/fxrates"
 )
@@ -29,33 +30,23 @@ func NewHandlers(fxClient *fxrates.Client, logger *slog.Logger) *FxHandler {
 	}
 }
 
-// Start handles the /inicio command
+// Start handles the /start command
 func (h *FxHandler) Start(ctx context.Context, b *bot.Bot, update *models.Update) {
-	lang := h.languageForCommand(update.Message.Text)
-
-	h.reply(ctx, b, update, StartMessage(lang))
+	h.reply(ctx, b, update, StartMessage())
 }
 
 // Help handles the /ayuda command
 func (h *FxHandler) Help(ctx context.Context, b *bot.Bot, update *models.Update) {
-	lang := h.languageForCommand(update.Message.Text)
-
-	h.reply(ctx, b, update, HelpMessage(lang))
+	h.reply(ctx, b, update, HelpMessage())
 }
 
-// Rate handles the /tasa command
+// Rate handles the /tasa command.
+// With no args, it shows the dashboard; with one arg, shows pair vs VES; two args, shows explicit pair
 func (h *FxHandler) Rate(ctx context.Context, b *bot.Bot, update *models.Update) {
-	lang := h.languageForCommand(update.Message.Text)
-
 	args := h.parseArgs(update.Message.Text)
 
 	if len(args) < 1 {
-		usage := "/tasa <base> [destino]"
-		if lang == LanguageEN {
-			usage = "/rate <base> [target]"
-		}
-
-		h.reply(ctx, b, update, InvalidUsageMessage(usage, lang))
+		h.dashboard(ctx, b, update)
 
 		return
 	}
@@ -71,76 +62,88 @@ func (h *FxHandler) Rate(ctx context.Context, b *bot.Bot, update *models.Update)
 
 	rates, err := h.fxClient.Rate(ctx, base, target, source.String())
 	if err != nil {
-		h.reply(ctx, b, update, ErrorMessage(err, lang))
+		h.reply(ctx, b, update, ErrorMessage(err))
 
 		return
 	}
 
 	rate := selectPreferredRate(rates.Results)
 	if rate == nil {
-		if lang == LanguageEN {
-			h.reply(ctx, b, update, "No rates found for "+base+"/"+target)
-		} else {
-			h.reply(ctx, b, update, "No se encontraron tasas para "+base+"/"+target)
-		}
+		h.reply(ctx, b, update, "No se encontraron tasas para "+base+"/"+target)
 
 		return
 	}
 
-	h.reply(ctx, b, update, FormatRate(*rate, lang))
+	h.reply(ctx, b, update, FormatRate(*rate))
 }
 
-// Rates handles the /tasas command
-func (h *FxHandler) Rates(ctx context.Context, b *bot.Bot, update *models.Update) {
-	lang := h.languageForCommand(update.Message.Text)
+// dashboard fetches USD, EUR, and USDT rates in parallel and renders the dashboard
+func (h *FxHandler) dashboard(ctx context.Context, b *bot.Bot, update *models.Update) {
+	var (
+		usdRate  *fxrates.ExchangeRate
+		eurRate  *fxrates.ExchangeRate
+		usdtPage *fxrates.PageExchangeRate
+	)
 
-	args := h.parseArgs(update.Message.Text)
+	g, gctx := errgroup.WithContext(ctx)
 
-	if len(args) < 1 {
-		usage := "/tasas <base>"
-		if lang == LanguageEN {
-			usage = "/rates <base>"
+	g.Go(func() error {
+		rates, err := h.fxClient.Rate(gctx, currencies.USD.String(), currencies.VES.String(), ves.BCVSource.String())
+		if err != nil {
+			return err
 		}
 
-		h.reply(ctx, b, update, InvalidUsageMessage(usage, lang))
+		usdRate = selectPreferredRate(rates.Results)
 
-		return
-	}
+		return nil
+	})
 
-	base := strings.ToUpper(args[0])
-
-	rates, err := h.fxClient.Rates(ctx, base)
-	if err != nil {
-		h.reply(ctx, b, update, ErrorMessage(err, lang))
-
-		return
-	}
-
-	if len(rates.Results) == 0 {
-		if lang == LanguageEN {
-			h.reply(ctx, b, update, "No rates found for "+base)
-		} else {
-			h.reply(ctx, b, update, "No se encontraron tasas para "+base)
+	g.Go(func() error {
+		rates, err := h.fxClient.Rate(gctx, currencies.EUR.String(), currencies.VES.String(), ves.BCVSource.String())
+		if err != nil {
+			return err
 		}
 
+		eurRate = selectPreferredRate(rates.Results)
+
+		return nil
+	})
+
+	g.Go(func() error {
+		rates, err := h.fxClient.Rate(gctx, currencies.USDT.String(), currencies.VES.String(), "")
+		if err != nil {
+			return err
+		}
+
+		usdtPage = rates
+
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		h.reply(ctx, b, update, ErrorMessage(err))
+
 		return
 	}
 
-	h.reply(ctx, b, update, FormatRates(rates.Results, lang))
+	var usdtRates []fxrates.ExchangeRate
+	if usdtPage != nil {
+		usdtRates = usdtPage.Results
+	}
+
+	h.reply(ctx, b, update, FormatDashboard(usdRate, eurRate, usdtRates))
 }
 
 // Currencies handles the /monedas command
 func (h *FxHandler) Currencies(ctx context.Context, b *bot.Bot, update *models.Update) {
-	lang := h.languageForCommand(update.Message.Text)
-
 	availableCurrencies, err := h.fxClient.Currencies(ctx)
 	if err != nil {
-		h.reply(ctx, b, update, ErrorMessage(err, lang))
+		h.reply(ctx, b, update, ErrorMessage(err))
 
 		return
 	}
 
-	h.reply(ctx, b, update, FormatCurrencies(availableCurrencies.Results, lang))
+	h.reply(ctx, b, update, FormatCurrencies(availableCurrencies.Results))
 }
 
 // Dolar handles the /dolar shortcut
@@ -159,7 +162,7 @@ func (h *FxHandler) USDT(ctx context.Context, b *bot.Bot, update *models.Update)
 
 	rates, err := h.fxClient.Rate(ctx, currencies.USDT.String(), target, "")
 	if err != nil {
-		h.reply(ctx, b, update, ErrorMessage(err, LanguageES))
+		h.reply(ctx, b, update, ErrorMessage(err))
 
 		return
 	}
@@ -170,22 +173,7 @@ func (h *FxHandler) USDT(ctx context.Context, b *bot.Bot, update *models.Update)
 		return
 	}
 
-	h.reply(ctx, b, update, FormatRates(rates.Results, LanguageES))
-}
-
-// Rublo handles the /rublo shortcut
-func (h *FxHandler) Rublo(ctx context.Context, b *bot.Bot, update *models.Update) {
-	h.rateShortcut(ctx, b, update, currencies.RUB.String())
-}
-
-// Lira handles the /lira shortcut
-func (h *FxHandler) Lira(ctx context.Context, b *bot.Bot, update *models.Update) {
-	h.rateShortcut(ctx, b, update, currencies.TRY.String())
-}
-
-// Yuan handles the /yuan shortcut
-func (h *FxHandler) Yuan(ctx context.Context, b *bot.Bot, update *models.Update) {
-	h.rateShortcut(ctx, b, update, currencies.CNY.String())
+	h.reply(ctx, b, update, FormatRates(rates.Results))
 }
 
 // InlineQuery handles inline mode requests
@@ -195,11 +183,9 @@ func (h *FxHandler) InlineQuery(ctx context.Context, b *bot.Bot, update *models.
 		return
 	}
 
-	lang := h.languageForInline(inlineQuery)
-
 	base, target, ok := parseInlineQuery(inlineQuery.Query)
 	if !ok {
-		h.answerInlineHelp(ctx, b, inlineQuery, lang)
+		h.answerInlineHelp(ctx, b, inlineQuery)
 
 		return
 	}
@@ -208,21 +194,21 @@ func (h *FxHandler) InlineQuery(ctx context.Context, b *bot.Bot, update *models.
 
 	rates, err := h.fxClient.Rate(ctx, base, target, source.String())
 	if err != nil {
-		h.answerInlineError(ctx, b, inlineQuery, lang)
+		h.answerInlineError(ctx, b, inlineQuery)
 
 		return
 	}
 
 	rate := selectPreferredRate(rates.Results)
 	if rate == nil {
-		h.answerInlineEmpty(ctx, b, inlineQuery, lang, base, target)
+		h.answerInlineEmpty(ctx, b, inlineQuery, base, target)
 
 		return
 	}
 
 	title := fmt.Sprintf("%s/%s", rate.Base, rate.Target)
 	description := fmt.Sprintf("%.4f (%s, %s)", rate.Rate, rate.Source, rate.RateType)
-	message := FormatRate(*rate, lang)
+	message := FormatRate(*rate)
 
 	h.answerInlineResults(ctx, b, inlineQuery, []models.InlineQueryResult{
 		&models.InlineQueryResultArticle{
@@ -231,6 +217,7 @@ func (h *FxHandler) InlineQuery(ctx context.Context, b *bot.Bot, update *models.
 			Description: description,
 			InputMessageContent: &models.InputTextMessageContent{
 				MessageText: message,
+				ParseMode:   models.ParseModeHTML,
 			},
 		},
 	})
@@ -242,7 +229,7 @@ func (h *FxHandler) rateShortcut(ctx context.Context, b *bot.Bot, update *models
 
 	rates, err := h.fxClient.Rate(ctx, base, target, source.String())
 	if err != nil {
-		h.reply(ctx, b, update, ErrorMessage(err, LanguageES))
+		h.reply(ctx, b, update, ErrorMessage(err))
 
 		return
 	}
@@ -254,7 +241,7 @@ func (h *FxHandler) rateShortcut(ctx context.Context, b *bot.Bot, update *models
 		return
 	}
 
-	h.reply(ctx, b, update, FormatRate(*rate, LanguageES))
+	h.reply(ctx, b, update, FormatRate(*rate))
 }
 
 func (h *FxHandler) parseArgs(text string) []string {
@@ -266,41 +253,6 @@ func (h *FxHandler) parseArgs(text string) []string {
 	return parts[1:]
 }
 
-func (h *FxHandler) commandName(text string) string {
-	parts := strings.Fields(text)
-	if len(parts) == 0 {
-		return ""
-	}
-
-	command := strings.ToLower(parts[0])
-	if at := strings.Index(command, "@"); at != -1 {
-		command = command[:at]
-	}
-
-	return command
-}
-
-func (h *FxHandler) languageForCommand(text string) Language {
-	switch h.commandName(text) {
-	case "/start", "/help", "/rate", "/rates", "/currencies":
-		return LanguageEN
-	default:
-		return LanguageES
-	}
-}
-
-func (h *FxHandler) languageForInline(query *models.InlineQuery) Language {
-	if query == nil || query.From == nil {
-		return LanguageES
-	}
-
-	if strings.HasPrefix(strings.ToLower(query.From.LanguageCode), "en") {
-		return LanguageEN
-	}
-
-	return LanguageES
-}
-
 func (h *FxHandler) reply(ctx context.Context, b *bot.Bot, update *models.Update, text string) {
 	h.logger.Debug("sending reply",
 		"chat_id", update.Message.Chat.ID,
@@ -308,8 +260,9 @@ func (h *FxHandler) reply(ctx context.Context, b *bot.Bot, update *models.Update
 	)
 
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: update.Message.Chat.ID,
-		Text:   text,
+		ChatID:    update.Message.Chat.ID,
+		Text:      text,
+		ParseMode: models.ParseModeHTML,
 	})
 	if err != nil {
 		h.logger.Error("failed to send message",
@@ -323,25 +276,14 @@ func (h *FxHandler) answerInlineHelp(
 	ctx context.Context,
 	b *bot.Bot,
 	query *models.InlineQuery,
-	lang Language,
 ) {
-	title := "Ayuda"
-	description := "Escribe: USD VES (destino VES por defecto)"
-	message := "Usa: USD VES o solo USD"
-
-	if lang == LanguageEN {
-		title = "Help"
-		description = "Type: USD VES (default target VES)"
-		message = "Use: USD VES or just USD"
-	}
-
 	h.answerInlineResults(ctx, b, query, []models.InlineQueryResult{
 		&models.InlineQueryResultArticle{
 			ID:          "help",
-			Title:       title,
-			Description: description,
+			Title:       "Ayuda",
+			Description: "Escribe: USD VES (destino VES por defecto)",
 			InputMessageContent: &models.InputTextMessageContent{
-				MessageText: message,
+				MessageText: "Usa: USD VES o solo USD",
 			},
 		},
 	})
@@ -351,24 +293,15 @@ func (h *FxHandler) answerInlineEmpty(
 	ctx context.Context,
 	b *bot.Bot,
 	query *models.InlineQuery,
-	lang Language,
 	base string,
 	target string,
 ) {
-	title := "Sin resultados"
-	message := "No se encontraron tasas para " + base + "/" + target
-
-	if lang == LanguageEN {
-		title = "No results"
-		message = "No rates found for " + base + "/" + target
-	}
-
 	h.answerInlineResults(ctx, b, query, []models.InlineQueryResult{
 		&models.InlineQueryResultArticle{
 			ID:    "empty",
-			Title: title,
+			Title: "Sin resultados",
 			InputMessageContent: &models.InputTextMessageContent{
-				MessageText: message,
+				MessageText: "No se encontraron tasas para " + base + "/" + target,
 			},
 		},
 	})
@@ -378,21 +311,13 @@ func (h *FxHandler) answerInlineError(
 	ctx context.Context,
 	b *bot.Bot,
 	query *models.InlineQuery,
-	lang Language,
 ) {
-	title := "Error"
-	message := "No se pudo obtener la tasa"
-
-	if lang == LanguageEN {
-		message = "Unable to fetch the rate"
-	}
-
 	h.answerInlineResults(ctx, b, query, []models.InlineQueryResult{
 		&models.InlineQueryResultArticle{
 			ID:    "error",
-			Title: title,
+			Title: "Error",
 			InputMessageContent: &models.InputTextMessageContent{
-				MessageText: message,
+				MessageText: "No se pudo obtener la tasa",
 			},
 		},
 	})

@@ -62,29 +62,15 @@ func New(
 }
 
 func (b *Bot) registerHandlers() {
-	// Core commands
-	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/inicio", bot.MatchTypePrefix, b.handler.Start)
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypePrefix, b.handler.Start)
-
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/ayuda", bot.MatchTypePrefix, b.handler.Help)
-	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/help", bot.MatchTypePrefix, b.handler.Help)
-
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/tasa", bot.MatchTypePrefix, b.handler.Rate)
-	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/rate", bot.MatchTypePrefix, b.handler.Rate)
-
-	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/tasas", bot.MatchTypePrefix, b.handler.Rates)
-	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/rates", bot.MatchTypePrefix, b.handler.Rates)
-
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/monedas", bot.MatchTypePrefix, b.handler.Currencies)
-	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/currencies", bot.MatchTypePrefix, b.handler.Currencies)
 
 	// VES shortcuts
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/dolar", bot.MatchTypePrefix, b.handler.Dolar)
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/euro", bot.MatchTypePrefix, b.handler.Euro)
 	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/usdt", bot.MatchTypePrefix, b.handler.USDT)
-	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/rublo", bot.MatchTypePrefix, b.handler.Rublo)
-	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/lira", bot.MatchTypePrefix, b.handler.Lira)
-	b.bot.RegisterHandler(bot.HandlerTypeMessageText, "/yuan", bot.MatchTypePrefix, b.handler.Yuan)
 }
 
 // StartWebhook begins webhook mode dispatching for updates
