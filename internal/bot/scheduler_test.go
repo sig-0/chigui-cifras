@@ -376,10 +376,10 @@ func TestNextSendAfter(t *testing.T) {
 	now := time.Date(2026, time.February, 9, 12, 0, 0, 0, time.UTC)
 
 	testTable := []struct {
-		name       string
 		lastSendAt time.Time
-		interval   time.Duration
 		want       time.Time
+		name       string
+		interval   time.Duration
 	}{
 		{
 			name:       "hourly one second late",

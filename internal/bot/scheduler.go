@@ -24,9 +24,9 @@ type Scheduler struct {
 	fxClient          *fxrates.Client
 	sender            MessageSender
 	logger            *slog.Logger
+	nowFn             func() time.Time
 	broadcastInterval time.Duration
 	alertInterval     time.Duration
-	nowFn             func() time.Time
 }
 
 // NewScheduler creates a new Scheduler
@@ -115,9 +115,9 @@ func (s *Scheduler) broadcastDue(ctx context.Context) {
 		if cycleNow.Sub(sub.NextSendAt) > interval {
 			skippedStale++
 
-			if err := s.store.UpdateNextSend(ctx, sub.ChatID, nextSendAt); err != nil {
+			if updateErr := s.store.UpdateNextSend(ctx, sub.ChatID, nextSendAt); updateErr != nil {
 				s.logger.Error("failed to update next_send_at",
-					"chat_id", sub.ChatID, "error", err)
+					"chat_id", sub.ChatID, "error", updateErr)
 			}
 
 			continue
@@ -185,9 +185,9 @@ func nextSendAfter(now, lastSendAt time.Time, interval time.Duration) time.Time 
 
 	// Find how many full intervals fit between last send and now
 	elapsed := now.Sub(lastSendAt)
-	n := elapsed / interval
+	n := int64(elapsed / interval)
 
-	next = lastSendAt.Add((n + 1) * interval)
+	next = lastSendAt.Add(time.Duration(n+1) * interval)
 
 	return next
 }
