@@ -26,6 +26,7 @@ type Scheduler struct {
 	logger            *slog.Logger
 	broadcastInterval time.Duration
 	alertInterval     time.Duration
+	nowFn             func() time.Time
 }
 
 // NewScheduler creates a new Scheduler
@@ -44,6 +45,7 @@ func NewScheduler(
 		broadcastInterval: broadcastInterval,
 		alertInterval:     alertInterval,
 		logger:            logger,
+		nowFn:             time.Now,
 	}
 }
 
@@ -83,6 +85,8 @@ func (s *Scheduler) runBroadcastLoop(ctx context.Context) {
 }
 
 func (s *Scheduler) broadcastDue(ctx context.Context) {
+	cycleNow := s.nowFn()
+
 	subscribers, err := s.store.DueSubscribers(ctx)
 	if err != nil {
 		s.logger.Error("failed to fetch due subscribers", "error", err)
@@ -94,14 +98,42 @@ func (s *Scheduler) broadcastDue(ctx context.Context) {
 		return
 	}
 
-	message, err := s.fetchDashboardMessage(ctx)
-	if err != nil {
-		s.logger.Error("failed to fetch dashboard for broadcast", "error", err)
-
-		return
-	}
+	var (
+		message      string
+		fetched      bool
+		sentCount    int
+		skippedStale int
+	)
 
 	for _, sub := range subscribers {
+		var (
+			interval   = intervalForFrequency(sub.Frequency)
+			nextSendAt = nextSendAfter(cycleNow, sub.NextSendAt, interval)
+		)
+
+		// Check if this notification is stale
+		if cycleNow.Sub(sub.NextSendAt) > interval {
+			skippedStale++
+
+			if err := s.store.UpdateNextSend(ctx, sub.ChatID, nextSendAt); err != nil {
+				s.logger.Error("failed to update next_send_at",
+					"chat_id", sub.ChatID, "error", err)
+			}
+
+			continue
+		}
+
+		if !fetched {
+			message, err = s.fetchDashboardMessage(ctx)
+			if err != nil {
+				s.logger.Error("failed to fetch dashboard for broadcast", "error", err)
+
+				return
+			}
+
+			fetched = true
+		}
+
 		if err := s.sender.SendHTMLMessage(ctx, sub.ChatID, message); err != nil {
 			s.logger.Warn("broadcast send failed, unsubscribing",
 				"chat_id", sub.ChatID, "error", err)
@@ -114,15 +146,20 @@ func (s *Scheduler) broadcastDue(ctx context.Context) {
 			continue
 		}
 
-		nextSendAt := time.Now().Add(intervalForFrequency(sub.Frequency))
-
 		if err := s.store.UpdateNextSend(ctx, sub.ChatID, nextSendAt); err != nil {
 			s.logger.Error("failed to update next_send_at",
 				"chat_id", sub.ChatID, "error", err)
 		}
+
+		sentCount++
 	}
 
-	s.logger.Info("broadcast cycle complete", "recipients", len(subscribers))
+	s.logger.Info(
+		"broadcast cycle complete",
+		"due_subscribers", len(subscribers),
+		"sent", sentCount,
+		"skipped_stale", skippedStale,
+	)
 }
 
 // intervalForFrequency returns the interval duration for a given frequency
@@ -135,6 +172,24 @@ func intervalForFrequency(frequency string) time.Duration {
 	default:
 		return 24 * time.Hour
 	}
+}
+
+// nextSendAfter returns the earliest time after now that is
+// lastSendAt + N*interval for some positive integer N.
+// This avoids drift and avoids spam after downtime (always lands in the future)
+func nextSendAfter(now, lastSendAt time.Time, interval time.Duration) time.Time {
+	next := lastSendAt.Add(interval)
+	if !next.Before(now) {
+		return next
+	}
+
+	// Find how many full intervals fit between last send and now
+	elapsed := now.Sub(lastSendAt)
+	n := elapsed / interval
+
+	next = lastSendAt.Add((n + 1) * interval)
+
+	return next
 }
 
 func (s *Scheduler) fetchDashboardMessage(ctx context.Context) (string, error) {

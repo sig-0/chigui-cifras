@@ -50,8 +50,9 @@ func (a *Adapter) DueSubscribers(ctx context.Context) ([]*storage.Subscriber, er
 	subs := make([]*storage.Subscriber, len(rows))
 	for i, r := range rows {
 		subs[i] = &storage.Subscriber{
-			ChatID:    r.ChatID,
-			Frequency: r.Frequency,
+			ChatID:     r.ChatID,
+			Frequency:  r.Frequency,
+			NextSendAt: r.NextSendAt.Time,
 		}
 	}
 

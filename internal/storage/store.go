@@ -40,8 +40,9 @@ type Store interface {
 
 // Subscriber represents a user subscribed to broadcasts
 type Subscriber struct {
-	Frequency string // FrequencyHourly or FrequencyDaily
-	ChatID    int64
+	NextSendAt time.Time
+	Frequency  string // FrequencyHourly or FrequencyDaily
+	ChatID     int64
 }
 
 // Alert represents a price threshold alert

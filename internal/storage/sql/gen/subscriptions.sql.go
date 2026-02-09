@@ -12,12 +12,13 @@ import (
 )
 
 const dueSubscribers = `-- name: DueSubscribers :many
-SELECT chat_id, frequency FROM subscriptions WHERE next_send_at <= now() ORDER BY next_send_at
+SELECT chat_id, frequency, next_send_at FROM subscriptions WHERE next_send_at <= now() ORDER BY next_send_at
 `
 
 type DueSubscribersRow struct {
-	ChatID    int64
-	Frequency string
+	ChatID     int64
+	Frequency  string
+	NextSendAt pgtype.Timestamptz
 }
 
 func (q *Queries) DueSubscribers(ctx context.Context) ([]DueSubscribersRow, error) {
@@ -29,7 +30,7 @@ func (q *Queries) DueSubscribers(ctx context.Context) ([]DueSubscribersRow, erro
 	var items []DueSubscribersRow
 	for rows.Next() {
 		var i DueSubscribersRow
-		if err := rows.Scan(&i.ChatID, &i.Frequency); err != nil {
+		if err := rows.Scan(&i.ChatID, &i.Frequency, &i.NextSendAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

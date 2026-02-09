@@ -90,11 +90,13 @@ func TestBroadcastDue_SendsToSubscribers(t *testing.T) {
 
 	var updatedChats []int64
 
+	now := time.Now()
+
 	store := &mockStore{
 		dueSubscribersFn: func(_ context.Context) ([]*storage.Subscriber, error) {
 			return []*storage.Subscriber{
-				{ChatID: 1, Frequency: storage.FrequencyHourly},
-				{ChatID: 2, Frequency: storage.FrequencyDaily},
+				{ChatID: 1, Frequency: storage.FrequencyHourly, NextSendAt: now},
+				{ChatID: 2, Frequency: storage.FrequencyDaily, NextSendAt: now},
 			}, nil
 		},
 		updateNextSendFn: func(_ context.Context, chatID int64, _ time.Time) error {
@@ -187,7 +189,7 @@ func TestBroadcastDue_SendFailureUnsubscribes(t *testing.T) {
 	store := &mockStore{
 		dueSubscribersFn: func(_ context.Context) ([]*storage.Subscriber, error) {
 			return []*storage.Subscriber{
-				{ChatID: 1, Frequency: storage.FrequencyDaily},
+				{ChatID: 1, Frequency: storage.FrequencyDaily, NextSendAt: time.Now()},
 			}, nil
 		},
 		unsubscribeFn: func(_ context.Context, chatID int64) error {
@@ -218,7 +220,7 @@ func TestBroadcastDue_APIErrorSkipsSend(t *testing.T) {
 	store := &mockStore{
 		dueSubscribersFn: func(_ context.Context) ([]*storage.Subscriber, error) {
 			return []*storage.Subscriber{
-				{ChatID: 1, Frequency: storage.FrequencyDaily},
+				{ChatID: 1, Frequency: storage.FrequencyDaily, NextSendAt: time.Now()},
 			}, nil
 		},
 	}
@@ -250,11 +252,14 @@ func TestBroadcastDue_UpdateNextSendUsesCorrectInterval(t *testing.T) {
 
 	recorded := make(map[int64]time.Time)
 
+	// NextSendAt just before now simulates a normal on-time tick
+	justNow := time.Now().Add(-time.Second)
+
 	store := &mockStore{
 		dueSubscribersFn: func(_ context.Context) ([]*storage.Subscriber, error) {
 			return []*storage.Subscriber{
-				{ChatID: 10, Frequency: storage.FrequencyHourly},
-				{ChatID: 20, Frequency: storage.FrequencyDaily},
+				{ChatID: 10, Frequency: storage.FrequencyHourly, NextSendAt: justNow},
+				{ChatID: 20, Frequency: storage.FrequencyDaily, NextSendAt: justNow},
 			}, nil
 		},
 		updateNextSendFn: func(_ context.Context, chatID int64, nextSendAt time.Time) error {
@@ -269,23 +274,214 @@ func TestBroadcastDue_UpdateNextSendUsesCorrectInterval(t *testing.T) {
 
 	sched := newTestScheduler(store, fxrates.NewClient(srv.URL, time.Second), &mockSender{})
 
-	before := time.Now()
-
 	sched.broadcastDue(context.Background())
-
-	after := time.Now()
 
 	require.Len(t, recorded, 2)
 
-	// Hourly subscriber: next_send_at should be ~1h from now
-	hourlyNext := recorded[int64(10)]
-	assert.True(t, hourlyNext.After(before.Add(time.Hour-time.Second)))
-	assert.True(t, hourlyNext.Before(after.Add(time.Hour+time.Second)))
+	// Hourly subscriber
+	assert.Equal(t, justNow.Add(time.Hour), recorded[int64(10)])
 
-	// Daily subscriber: next_send_at should be ~24h from now
-	dailyNext := recorded[int64(20)]
-	assert.True(t, dailyNext.After(before.Add(24*time.Hour-time.Second)))
-	assert.True(t, dailyNext.Before(after.Add(24*time.Hour+time.Second)))
+	// Daily subscriber
+	assert.Equal(t, justNow.Add(24*time.Hour), recorded[int64(20)])
+}
+
+func TestBroadcastDue_UsesSingleCycleNow(t *testing.T) {
+	t.Parallel()
+
+	recorded := make(map[int64]time.Time)
+	now := time.Date(2026, time.February, 9, 12, 0, 0, 0, time.UTC)
+	justBeforeNow := now.Add(-time.Second)
+
+	store := &mockStore{
+		dueSubscribersFn: func(_ context.Context) ([]*storage.Subscriber, error) {
+			return []*storage.Subscriber{
+				{ChatID: 10, Frequency: storage.FrequencyHourly, NextSendAt: justBeforeNow},
+				{ChatID: 20, Frequency: storage.FrequencyDaily, NextSendAt: justBeforeNow},
+			}, nil
+		},
+		updateNextSendFn: func(_ context.Context, chatID int64, nextSendAt time.Time) error {
+			recorded[chatID] = nextSendAt
+
+			return nil
+		},
+	}
+
+	srv := newRateServer(t)
+	t.Cleanup(srv.Close)
+
+	sched := newTestScheduler(store, fxrates.NewClient(srv.URL, time.Second), &mockSender{})
+
+	var nowCalls int
+
+	sched.nowFn = func() time.Time {
+		nowCalls++
+
+		return now
+	}
+
+	sched.broadcastDue(context.Background())
+
+	assert.Equal(t, 1, nowCalls)
+	require.Len(t, recorded, 2)
+	assert.Equal(t, justBeforeNow.Add(time.Hour), recorded[int64(10)])
+	assert.Equal(t, justBeforeNow.Add(24*time.Hour), recorded[int64(20)])
+}
+
+func TestBroadcastDue_SkipsStaleSubscribers(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.February, 9, 12, 0, 0, 0, time.UTC)
+	recorded := make(map[int64]time.Time)
+
+	store := &mockStore{
+		dueSubscribersFn: func(_ context.Context) ([]*storage.Subscriber, error) {
+			return []*storage.Subscriber{
+				{ChatID: 1, Frequency: storage.FrequencyHourly, NextSendAt: now.Add(-2 * time.Hour)},
+				{ChatID: 2, Frequency: storage.FrequencyDaily, NextSendAt: now.Add(-48 * time.Hour)},
+			}, nil
+		},
+		updateNextSendFn: func(_ context.Context, chatID int64, nextSendAt time.Time) error {
+			recorded[chatID] = nextSendAt
+
+			return nil
+		},
+	}
+
+	var sendCalls int
+
+	sender := &mockSender{
+		sendHTMLMessageFn: func(context.Context, int64, string) error {
+			sendCalls++
+
+			return nil
+		},
+	}
+
+	// Invalid URL on purpose, if stale subscribers are skipped correctly,
+	// no API request is needed and updates still occur
+	sched := newTestScheduler(store, fxrates.NewClient("http://unused", time.Second), sender)
+	sched.nowFn = func() time.Time { return now }
+
+	sched.broadcastDue(context.Background())
+
+	assert.Zero(t, sendCalls)
+	require.Len(t, recorded, 2)
+	assert.Equal(t, now.Add(time.Hour), recorded[int64(1)])
+	assert.Equal(t, now.Add(24*time.Hour), recorded[int64(2)])
+}
+
+func TestNextSendAfter(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.February, 9, 12, 0, 0, 0, time.UTC)
+
+	testTable := []struct {
+		name       string
+		lastSendAt time.Time
+		interval   time.Duration
+		want       time.Time
+	}{
+		{
+			name:       "hourly one second late",
+			lastSendAt: now.Add(-time.Second),
+			interval:   time.Hour,
+			want:       now.Add(time.Hour - time.Second), // 12:59:59
+		},
+		{
+			name:       "daily five minutes late",
+			lastSendAt: now.Add(-5 * time.Minute),
+			interval:   24 * time.Hour,
+			want:       now.Add(24*time.Hour - 5*time.Minute), // tomorrow 11:55
+		},
+
+		{
+			name:       "hourly exactly on boundary",
+			lastSendAt: now.Add(-time.Hour),
+			interval:   time.Hour,
+			want:       now, // not before now, so no fast-forward needed
+		},
+		{
+			name:       "daily exactly on boundary",
+			lastSendAt: now.Add(-24 * time.Hour),
+			interval:   24 * time.Hour,
+			want:       now,
+		},
+
+		{
+			name:       "hourly one hour one second late",
+			lastSendAt: now.Add(-time.Hour - time.Second),
+			interval:   time.Hour,
+			want:       now.Add(time.Hour - time.Second), // skips the missed one
+		},
+
+		{
+			name:       "hourly two and a half hours late",
+			lastSendAt: now.Add(-2*time.Hour - 30*time.Minute),
+			interval:   time.Hour,
+			want:       now.Add(30 * time.Minute), // 12:30, next aligned slot
+		},
+		{
+			name:       "daily one and a half days late",
+			lastSendAt: now.Add(-36 * time.Hour),
+			interval:   24 * time.Hour,
+			want:       now.Add(12 * time.Hour), // today at midnight
+		},
+
+		{
+			name:       "hourly three days late",
+			lastSendAt: now.Add(-72 * time.Hour),
+			interval:   time.Hour,
+			want:       now.Add(time.Hour), // 13:00, skips all 72 missed
+		},
+		{
+			name:       "daily ten days late",
+			lastSendAt: now.Add(-10 * 24 * time.Hour),
+			interval:   24 * time.Hour,
+			want:       now.Add(24 * time.Hour), // tomorrow, skips all 10 missed
+		},
+		{
+			name:       "daily ten days and six hours late",
+			lastSendAt: now.Add(-10*24*time.Hour - 6*time.Hour),
+			interval:   24 * time.Hour,
+			want:       now.Add(18 * time.Hour), // 11 intervals from lastSendAt
+		},
+
+		{
+			name:       "hourly exactly five hours late",
+			lastSendAt: now.Add(-5 * time.Hour),
+			interval:   time.Hour,
+			want:       now.Add(time.Hour), // n=5, next = lastSendAt + 6h
+		},
+		{
+			name:       "daily exactly seven days late",
+			lastSendAt: now.Add(-7 * 24 * time.Hour),
+			interval:   24 * time.Hour,
+			want:       now.Add(24 * time.Hour), // n=7, next = lastSendAt + 8d
+		},
+
+		{
+			name:       "hourly one millisecond late",
+			lastSendAt: now.Add(-time.Millisecond),
+			interval:   time.Hour,
+			want:       now.Add(time.Hour - time.Millisecond),
+		},
+		{
+			name:       "hourly one hour and one millisecond late",
+			lastSendAt: now.Add(-time.Hour - time.Millisecond),
+			interval:   time.Hour,
+			want:       now.Add(time.Hour - time.Millisecond), // fast-forwards past the missed one
+		},
+	}
+
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := nextSendAfter(now, testCase.lastSendAt, testCase.interval)
+			assert.Equal(t, testCase.want, got)
+			assert.False(t, got.Before(now), "next send must not be in the past")
+		})
+	}
 }
 
 func TestCheckAlerts_TriggersAbove(t *testing.T) {
